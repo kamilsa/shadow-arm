@@ -122,7 +122,7 @@ void _shim_parent_init_preload() {
     _shim_ipc_wait_for_start_event();
 
     shim_install_hardware_error_handlers();
-    patch_vdso((void*)getauxval(AT_SYSINFO_EHDR));
+    patch_vdso((void*)getauxval(AT_SYSINFO_EHDR))
     _shim_parent_init_host_shm();
     _shim_parent_init_manager_shm();
     _shim_parent_init_logging();
