@@ -44,6 +44,7 @@ mod random;
 mod resource;
 mod sched;
 mod select;
+mod sem;
 mod shadow;
 mod signal;
 mod socket;
@@ -591,6 +592,8 @@ impl SyscallHandler {
             SyscallNum::NR_socket => handle!(socket),
             SyscallNum::NR_socketpair => handle!(socketpair),
             SyscallNum::NR_statx => handle!(statx),
+            SyscallNum::NR_swapon => handle!(swapon),
+            SyscallNum::NR_cachestat => handle!(cachestat),
             SyscallNum::NR_symlinkat => handle!(symlinkat),
             SyscallNum::NR_sync_file_range => handle!(sync_file_range),
             SyscallNum::NR_syncfs => handle!(syncfs),

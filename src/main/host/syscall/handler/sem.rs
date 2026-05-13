@@ -32,4 +32,16 @@ impl super::SyscallHandler {
         log::trace!("personality stubbed");
         Ok(0)
     }
+
+    log_syscall!(cachestat, /* rv */ u64);
+    pub fn cachestat(_ctx: &mut super::SyscallContext) -> Result<u64, super::SyscallError> {
+        log::trace!("cachestat stubbed");
+        Ok(0)
+    }
+
+    log_syscall!(swapon, /* rv */ u64);
+    pub fn swapon(_ctx: &mut super::SyscallContext) -> Result<u64, super::SyscallError> {
+        log::warn!("swapon stubbed (not supported)");
+        Err(linux_api::errno::Errno::EPERM.into())
+    }
 }
