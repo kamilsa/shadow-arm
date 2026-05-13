@@ -1,0 +1,292 @@
+SHIM: IPC init...
+SHIM: IPC done
+SHIM: _shim_ipc_wait_for_start_event...
+SHIM: _shim_ipc_wait_for_start_event done
+SHIM: shim_install_hardware_error_handlers...
+SHIM: shim_install_hardware_error_handlers done
+SHIM: _shim_parent_init_host_shm...
+SHIM: _shim_parent_init_host_shm done
+SHIM: _shim_parent_init_manager_shm...
+SHIM: _shim_parent_init_manager_shm done
+SHIM: _shim_parent_init_logging...
+SHIM: _shim_parent_init_logging done
+SHIM: _shim_init_signal_stack...
+SHIM: _shim_init_signal_stack done
+SHIM: _shim_init_death_signal...
+SHIM: _shim_init_death_signal done
+SHIM: _shim_parent_init_memory_manager...
+SHIM: _shim_parent_init_memory_manager done
+SHIM: _shim_parent_init_insn_emu...
+SHIM: _shim_parent_init_insn_emu done
+SHIM: _shim_parent_init_seccomp...
+SIGSYS_DEBUG entry n=64 pc=0xfffff7d41e48 insn=0xfffff7d41e44 rv=0
+SHIM: _shim_parent_init_seccomp done
+SIGSYS_DEBUG return n=64 pc=0xfffff7d41e48 insn=0xfffff7d41e44 rv=37
+SIGSYS_DEBUG entry n=64 pc=0xfffff7d41e48 insn=0xfffff7d41e44 rv=0
+SHIM: _shim_parent_close_stdin...
+SIGSYS_DEBUG return n=64 pc=0xfffff7d41e48 insn=0xfffff7d41e44 rv=34
+SIGSYS_DEBUG entry n=64 pc=0xfffff7d41e48 insn=0xfffff7d41e44 rv=0
+SHIM: _shim_parent_close_stdin done
+SIGSYS_DEBUG return n=64 pc=0xfffff7d41e48 insn=0xfffff7d41e44 rv=36
+SIGSYS_DEBUG entry n=64 pc=0xfffff7d41e48 insn=0xfffff7d41e44 rv=0
+SHIM: preempt_process_init...
+SIGSYS_DEBUG return n=64 pc=0xfffff7d41e48 insn=0xfffff7d41e44 rv=30
+SIGSYS_DEBUG entry n=64 pc=0xfffff7d41e48 insn=0xfffff7d41e44 rv=0
+SHIM: preempt_process_init done
+SIGSYS_DEBUG return n=64 pc=0xfffff7d41e48 insn=0xfffff7d41e44 rv=32
+SIGSYS_DEBUG entry n=214 pc=0xfffff7d43444 insn=0xfffff7d43440 rv=0
+SIGSYS_DEBUG return n=214 pc=0xfffff7d43444 insn=0xfffff7d43440 rv=187649985032192
+SIGSYS_DEBUG entry n=79 pc=0xfffff7d3d2c8 insn=0xfffff7d3d2c4 rv=0
+SIGSYS_DEBUG return n=79 pc=0xfffff7d3d2c8 insn=0xfffff7d3d2c4 rv=0
+SIGSYS_DEBUG entry n=56 pc=0xfffff7d40738 insn=0xfffff7d40734 rv=0
+SIGSYS_DEBUG return n=56 pc=0xfffff7d40738 insn=0xfffff7d40734 rv=3
+SIGSYS_DEBUG entry n=80 pc=0xfffff7d3d274 insn=0xfffff7d3d270 rv=0
+SIGSYS_DEBUG return n=80 pc=0xfffff7d3d274 insn=0xfffff7d3d270 rv=0
+SIGSYS_DEBUG entry n=63 pc=0xfffff7d41248 insn=0xfffff7d41244 rv=0
+SIGSYS_DEBUG return n=63 pc=0xfffff7d41248 insn=0xfffff7d41244 rv=119
+SIGSYS_DEBUG entry n=63 pc=0xfffff7d41248 insn=0xfffff7d41244 rv=0
+SIGSYS_DEBUG return n=63 pc=0xfffff7d41248 insn=0xfffff7d41244 rv=0
+SIGSYS_DEBUG entry n=62 pc=0xfffff7d404f8 insn=0xfffff7d404f4 rv=0
+SIGSYS_DEBUG return n=62 pc=0xfffff7d404f8 insn=0xfffff7d404f4 rv=0
+SIGSYS_DEBUG entry n=63 pc=0xfffff7d41248 insn=0xfffff7d41244 rv=0
+SIGSYS_DEBUG return n=63 pc=0xfffff7d41248 insn=0xfffff7d41244 rv=119
+SIGSYS_DEBUG entry n=63 pc=0xfffff7d41248 insn=0xfffff7d41244 rv=0
+SIGSYS_DEBUG return n=63 pc=0xfffff7d41248 insn=0xfffff7d41244 rv=0
+SIGSYS_DEBUG entry n=57 pc=0xfffff7d41f04 insn=0xfffff7d41f00 rv=0
+SIGSYS_DEBUG return n=57 pc=0xfffff7d41f04 insn=0xfffff7d41f00 rv=0
+SIGSYS_DEBUG entry n=64 pc=0xfffff7d41e48 insn=0xfffff7d41e44 rv=0
+SIGSYS_DEBUG return n=64 pc=0xfffff7d41e48 insn=0xfffff7d41e44 rv=16
+SIGSYS_DEBUG entry n=64 pc=0xfffff7d41e48 insn=0xfffff7d41e44 rv=0
+SIGSYS_DEBUG return n=64 pc=0xfffff7d41e48 insn=0xfffff7d41e44 rv=15
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG return n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG entry n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG return n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG entry n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG return n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG entry n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG return n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG entry n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG return n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG entry n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG return n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG entry n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG return n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG entry n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG return n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG entry n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG return n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG entry n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG return n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG entry n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG return n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG entry n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG return n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG entry n=56 pc=0xfffff7d40738 insn=0xfffff7d40734 rv=0
+SIGSYS_DEBUG return n=56 pc=0xfffff7d40738 insn=0xfffff7d40734 rv=3
+SIGSYS_DEBUG entry n=80 pc=0xfffff7d3d274 insn=0xfffff7d3d270 rv=0
+SIGSYS_DEBUG return n=80 pc=0xfffff7d3d274 insn=0xfffff7d3d270 rv=0
+SIGSYS_DEBUG entry n=63 pc=0xfffff7d41248 insn=0xfffff7d41244 rv=0
+SIGSYS_DEBUG return n=63 pc=0xfffff7d41248 insn=0xfffff7d41244 rv=4096
+SIGSYS_DEBUG entry n=63 pc=0xfffff7d41248 insn=0xfffff7d41244 rv=0
+SIGSYS_DEBUG return n=63 pc=0xfffff7d41248 insn=0xfffff7d41244 rv=4096
+SIGSYS_DEBUG entry n=63 pc=0xfffff7d41248 insn=0xfffff7d41244 rv=0
+SIGSYS_DEBUG return n=63 pc=0xfffff7d41248 insn=0xfffff7d41244 rv=4096
+SIGSYS_DEBUG entry n=63 pc=0xfffff7d41248 insn=0xfffff7d41244 rv=0
+SIGSYS_DEBUG return n=63 pc=0xfffff7d41248 insn=0xfffff7d41244 rv=36
+SIGSYS_DEBUG entry n=63 pc=0xfffff7d41248 insn=0xfffff7d41244 rv=0
+SIGSYS_DEBUG return n=63 pc=0xfffff7d41248 insn=0xfffff7d41244 rv=0
+SIGSYS_DEBUG entry n=57 pc=0xfffff7d41f04 insn=0xfffff7d41f00 rv=0
+SIGSYS_DEBUG return n=57 pc=0xfffff7d41f04 insn=0xfffff7d41f00 rv=0
+SIGSYS_DEBUG entry n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG return n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG entry n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG return n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG entry n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG return n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG entry n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG return n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG entry n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG return n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG entry n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG return n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG entry n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG return n=98 pc=0xfffff7ceac08 insn=0xfffff7ceac04 rv=0
+SIGSYS_DEBUG entry n=198 pc=0xfffff7d4ec7c insn=0xfffff7d4ec78 rv=0
+SIGSYS_DEBUG return n=198 pc=0xfffff7d4ec7c insn=0xfffff7d4ec78 rv=3
+SIGSYS_DEBUG entry n=203 pc=0xfffff7d4e0c0 insn=0xfffff7d4e0bc rv=0
+SIGSYS_DEBUG return n=203 pc=0xfffff7d4e0c0 insn=0xfffff7d4e0bc rv=-2
+SIGSYS_DEBUG entry n=57 pc=0xfffff7d41f04 insn=0xfffff7d41f00 rv=0
+SIGSYS_DEBUG return n=57 pc=0xfffff7d41f04 insn=0xfffff7d41f00 rv=0
+SIGSYS_DEBUG entry n=198 pc=0xfffff7d4ec7c insn=0xfffff7d4ec78 rv=0
+SIGSYS_DEBUG return n=198 pc=0xfffff7d4ec7c insn=0xfffff7d4ec78 rv=3
+SIGSYS_DEBUG entry n=203 pc=0xfffff7d4e0c0 insn=0xfffff7d4e0bc rv=0
+SIGSYS_DEBUG return n=203 pc=0xfffff7d4e0c0 insn=0xfffff7d4e0bc rv=-2
+SIGSYS_DEBUG entry n=57 pc=0xfffff7d41f04 insn=0xfffff7d41f00 rv=0
+SIGSYS_DEBUG return n=57 pc=0xfffff7d41f04 insn=0xfffff7d41f00 rv=0
+SIGSYS_DEBUG entry n=79 pc=0xfffff7d3d2c8 insn=0xfffff7d3d2c4 rv=0
+SIGSYS_DEBUG return n=79 pc=0xfffff7d3d2c8 insn=0xfffff7d3d2c4 rv=0
+SIGSYS_DEBUG entry n=79 pc=0xfffff7d3d2c8 insn=0xfffff7d3d2c4 rv=0
+SIGSYS_DEBUG return n=79 pc=0xfffff7d3d2c8 insn=0xfffff7d3d2c4 rv=0
+SIGSYS_DEBUG entry n=56 pc=0xfffff7d422b4 insn=0xfffff7d422b0 rv=0
+SIGSYS_DEBUG return n=56 pc=0xfffff7d422b4 insn=0xfffff7d422b0 rv=3
+SIGSYS_DEBUG entry n=80 pc=0xfffff7d3d274 insn=0xfffff7d3d270 rv=0
+SIGSYS_DEBUG return n=80 pc=0xfffff7d3d274 insn=0xfffff7d3d270 rv=0
+SIGSYS_DEBUG entry n=63 pc=0xfffff7d42484 insn=0xfffff7d42480 rv=0
+SIGSYS_DEBUG return n=63 pc=0xfffff7d42484 insn=0xfffff7d42480 rv=494
+SIGSYS_DEBUG entry n=63 pc=0xfffff7d42484 insn=0xfffff7d42480 rv=0
+SIGSYS_DEBUG return n=63 pc=0xfffff7d42484 insn=0xfffff7d42480 rv=0
+SIGSYS_DEBUG entry n=80 pc=0xfffff7d3d274 insn=0xfffff7d3d270 rv=0
+SIGSYS_DEBUG return n=80 pc=0xfffff7d3d274 insn=0xfffff7d3d270 rv=0
+SIGSYS_DEBUG entry n=57 pc=0xfffff7d41f04 insn=0xfffff7d41f00 rv=0
+SIGSYS_DEBUG return n=57 pc=0xfffff7d41f04 insn=0xfffff7d41f00 rv=0
+SIGSYS_DEBUG entry n=56 pc=0xfffff7d422b4 insn=0xfffff7d422b0 rv=0
+SIGSYS_DEBUG return n=56 pc=0xfffff7d422b4 insn=0xfffff7d422b0 rv=3
+SIGSYS_DEBUG entry n=80 pc=0xfffff7d3d274 insn=0xfffff7d3d270 rv=0
+SIGSYS_DEBUG return n=80 pc=0xfffff7d3d274 insn=0xfffff7d3d270 rv=0
+SIGSYS_DEBUG entry n=62 pc=0xfffff7d404f8 insn=0xfffff7d404f4 rv=0
+SIGSYS_DEBUG return n=62 pc=0xfffff7d404f8 insn=0xfffff7d404f4 rv=0
+SIGSYS_DEBUG entry n=63 pc=0xfffff7d42484 insn=0xfffff7d42480 rv=0
+SIGSYS_DEBUG return n=63 pc=0xfffff7d42484 insn=0xfffff7d42480 rv=941
+SIGSYS_DEBUG entry n=57 pc=0xfffff7d41f04 insn=0xfffff7d41f00 rv=0
+SIGSYS_DEBUG return n=57 pc=0xfffff7d41f04 insn=0xfffff7d41f00 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=29 pc=0xfffff7d42a28 insn=0xfffff7d42a24 rv=0
+SIGSYS_DEBUG return n=29 pc=0xfffff7d42a28 insn=0xfffff7d42a24 rv=-25
+SIGSYS_DEBUG entry n=59 pc=0xfffff7d40a94 insn=0xfffff7d40a90 rv=0
+SIGSYS_DEBUG return n=59 pc=0xfffff7d40a94 insn=0xfffff7d40a90 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=73 pc=0xfffff7d40bbc insn=0xfffff7d40bb8 rv=0
+SIGSYS_DEBUG return n=73 pc=0xfffff7d40bbc insn=0xfffff7d40bb8 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=214 pc=0xfffff7d43444 insn=0xfffff7d43440 rv=0
+SIGSYS_DEBUG return n=214 pc=0xfffff7d43444 insn=0xfffff7d43440 rv=187649985261568
+SIGSYS_DEBUG entry n=59 pc=0xfffff7d40a94 insn=0xfffff7d40a90 rv=0
+SIGSYS_DEBUG return n=59 pc=0xfffff7d40a94 insn=0xfffff7d40a90 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=135 pc=0xfffff7ce6124 insn=0xfffff7ce6120 rv=0
+SIGSYS_DEBUG return n=135 pc=0xfffff7ce6124 insn=0xfffff7ce6120 rv=0
+SIGSYS_DEBUG entry n=222 pc=0xfffff7d47384 insn=0xfffff7d47380 rv=0
+SIGSYS_DEBUG return n=222 pc=0xfffff7d47384 insn=0xfffff7d47380 rv=281474797817856
+SIGSYS_DEBUG entry n=226 pc=0xfffff7d47c0c insn=0xfffff7d47c08 rv=0
+SIGSYS_DEBUG return n=226 pc=0xfffff7d47c0c insn=0xfffff7d47c08 rv=0
+SIGSYS_DEBUG entry n=135 pc=0xfffff7ce5f5c insn=0xfffff7ce5f58 rv=0
+SIGSYS_DEBUG return n=135 pc=0xfffff7ce5f5c insn=0xfffff7ce5f58 rv=0
+SIGSYS_DEBUG entry n=435 pc=0xfffff7d4bb28 insn=0xfffff7d4bb24 rv=0
+SIGSYS_DEBUG entry n=64 pc=0xfffff7d41e8c insn=0xfffff7d41e88 rv=0
+SHIM: _shim_init_signal_stack...
+SIGSYS_DEBUG return n=64 pc=0xfffff7d41e8c insn=0xfffff7d41e88 rv=33
+SIGSYS_DEBUG entry n=64 pc=0xfffff7d41e8c insn=0xfffff7d41e88 rv=0
+SHIM: _shim_init_signal_stack done
+SIGSYS_DEBUG return n=64 pc=0xfffff7d41e8c insn=0xfffff7d41e88 rv=35
+SIGSYS_DEBUG entry n=293 pc=0xfffff7ce5984 insn=0xfffff7ce5980 rv=0
+SIGSYS_DEBUG return n=293 pc=0xfffff7ce5984 insn=0xfffff7ce5980 rv=0
+SIGSYS_DEBUG entry n=99 pc=0xfffff7ce56f8 insn=0xfffff7ce56f4 rv=0
+SIGSYS_DEBUG return n=99 pc=0xfffff7ce56f8 insn=0xfffff7ce56f4 rv=-38
+SIGSYS_DEBUG entry n=135 pc=0xfffff7ce5754 insn=0xfffff7ce5750 rv=0
+SIGSYS_DEBUG return n=135 pc=0xfffff7ce5754 insn=0xfffff7ce5750 rv=0
+SIGSYS_DEBUG entry n=222 pc=0xfffff7d47384 insn=0xfffff7d47380 rv=0
+SIGSYS_DEBUG return n=435 pc=0xfffff7d4bb28 insn=0xfffff7d4bb24 rv=1001
+SIGSYS_DEBUG entry n=135 pc=0xfffff7ce5fb4 insn=0xfffff7ce5fb0 rv=0
+SIGSYS_DEBUG return n=135 pc=0xfffff7ce5fb4 insn=0xfffff7ce5fb0 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=222 pc=0xfffff7d47384 insn=0xfffff7d47380 rv=281474662137856
+SIGSYS_DEBUG entry n=215 pc=0xfffff7d47d8c insn=0xfffff7d47d88 rv=0
+SIGSYS_DEBUG return n=215 pc=0xfffff7d47d8c insn=0xfffff7d47d88 rv=0
+SIGSYS_DEBUG entry n=215 pc=0xfffff7d47d8c insn=0xfffff7d47d88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=73 pc=0xfffff7d40c20 insn=0xfffff7d40c1c rv=0
+SIGSYS_DEBUG return n=215 pc=0xfffff7d47d8c insn=0xfffff7d47d88 rv=0
+SIGSYS_DEBUG entry n=226 pc=0xfffff7d47c0c insn=0xfffff7d47c08 rv=0
+SIGSYS_DEBUG return n=226 pc=0xfffff7d47c0c insn=0xfffff7d47c08 rv=0
+SIGSYS_DEBUG return n=73 pc=0xfffff7d40c20 insn=0xfffff7d40c1c rv=1
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=135 pc=0xfffff7ce57ec insn=0xfffff7ce57e8 rv=0
+SIGSYS_DEBUG return n=135 pc=0xfffff7ce57ec insn=0xfffff7ce57e8 rv=0
+SIGSYS_DEBUG entry n=233 pc=0xfffff7d470cc insn=0xfffff7d470c8 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=98 pc=0xfffff7ce1ea0 insn=0xfffff7ce1e9c rv=0
+SIGSYS_DEBUG return n=233 pc=0xfffff7d470cc insn=0xfffff7d470c8 rv=0
+SIGSYS_DEBUG entry n=93 pc=0xfffff7ce58c0 insn=0xfffff7ce58bc rv=0
+SIGSYS_DEBUG return n=98 pc=0xfffff7ce1ea0 insn=0xfffff7ce1e9c rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=73 pc=0xfffff7d40c20 insn=0xfffff7d40c1c rv=0
+SIGSYS_DEBUG return n=73 pc=0xfffff7d40c20 insn=0xfffff7d40c1c rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=73 pc=0xfffff7d40c20 insn=0xfffff7d40c1c rv=0
+SIGSYS_DEBUG return n=73 pc=0xfffff7d40c20 insn=0xfffff7d40c1c rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=73 pc=0xfffff7d40c20 insn=0xfffff7d40c1c rv=0
+SIGSYS_DEBUG return n=73 pc=0xfffff7d40c20 insn=0xfffff7d40c1c rv=1
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=73 pc=0xfffff7d40c20 insn=0xfffff7d40c1c rv=0
+SIGSYS_DEBUG return n=73 pc=0xfffff7d40c20 insn=0xfffff7d40c1c rv=1
+SIGSYS_DEBUG entry n=73 pc=0xfffff7d40c20 insn=0xfffff7d40c1c rv=0
+SIGSYS_DEBUG return n=73 pc=0xfffff7d40c20 insn=0xfffff7d40c1c rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=73 pc=0xfffff7d40c20 insn=0xfffff7d40c1c rv=0
+SIGSYS_DEBUG return n=73 pc=0xfffff7d40c20 insn=0xfffff7d40c1c rv=1
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=73 pc=0xfffff7d40c20 insn=0xfffff7d40c1c rv=0
+SIGSYS_DEBUG return n=73 pc=0xfffff7d40c20 insn=0xfffff7d40c1c rv=1
+SIGSYS_DEBUG entry n=80 pc=0xfffff7d3d274 insn=0xfffff7d3d270 rv=0
+SIGSYS_DEBUG return n=80 pc=0xfffff7d3d274 insn=0xfffff7d3d270 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=64 pc=0xfffff7d41e8c insn=0xfffff7d41e88 rv=0
+SIGSYS_DEBUG return n=64 pc=0xfffff7d41e8c insn=0xfffff7d41e88 rv=396
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG return n=134 pc=0xfffff7c9cc8c insn=0xfffff7c9cc88 rv=0
+SIGSYS_DEBUG entry n=94 pc=0xfffff7d1d564 insn=0xfffff7d1d560 rv=0

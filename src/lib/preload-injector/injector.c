@@ -5,6 +5,7 @@
 
 #include <stddef.h>
 #include <syscall.h>
+#include <unistd.h>
 
 #include "lib/shim/shim_api.h"
 
