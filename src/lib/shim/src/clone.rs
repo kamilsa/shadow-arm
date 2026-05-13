@@ -35,7 +35,7 @@ unsafe fn align_down(ptr: *mut u8, align: usize) -> *mut u8 {
 }
 
 /// Helper for `do_clone`. Restores all general purpose registers, stack pointer,
-/// and instruction pointer from `ctx` except for `rax`, which is set to 0.
+/// and instruction pointer from `ctx` except for the return value register, which is set to 0.
 ///
 /// # Safety
 ///
@@ -45,6 +45,7 @@ unsafe fn align_down(ptr: *mut u8, align: usize) -> *mut u8 {
 /// stack and instruction pointers must be valid, and other register values must
 /// correspond to "sound" values of whatever state they correspond to at that
 /// instruction pointer.
+#[cfg(target_arch = "x86_64")]
 unsafe extern "C-unwind" fn set_context(ctx: &sigcontext) -> ! {
     // These offsets are hard-coded into the asm format string below.
     // TODO: turn these into const parameters to the asm block when const
@@ -99,6 +100,52 @@ unsafe extern "C-unwind" fn set_context(ctx: &sigcontext) -> ! {
             // Ret to ctx's `rip`
             "ret",
             in("rax") core::ptr::from_ref(ctx),
+            options(noreturn)
+        )
+    };
+}
+
+/// ARM64 version: restore all registers from sigcontext, set x0 = 0, branch to pc.
+///
+/// ARM64 sigcontext layout (from kernel asm/sigcontext.h):
+///   fault_address: 0x00 (8 bytes)
+///   regs[0..30]:   0x08 through 0xF8 (x0-x30)
+///   sp:            0x100
+///   pc:            0x108
+///   pstate:        0x110
+#[cfg(target_arch = "aarch64")]
+unsafe extern "C-unwind" fn set_context(ctx: &sigcontext) -> ! {
+    unsafe {
+        core::arch::asm!(
+            // x0 = ctx base pointer
+            // Load x1-x30 from ctx->regs[1..30] using ldp (load pair)
+            "ldp x2, x3, [x0, #0x18]",
+            "ldp x4, x5, [x0, #0x28]",
+            "ldp x6, x7, [x0, #0x38]",
+            "ldp x8, x9, [x0, #0x48]",
+            "ldp x10, x11, [x0, #0x58]",
+            "ldp x12, x13, [x0, #0x68]",
+            "ldp x14, x15, [x0, #0x78]",
+            "ldp x16, x17, [x0, #0x88]",
+            "ldp x18, x19, [x0, #0x98]",
+            "ldp x20, x21, [x0, #0xA8]",
+            "ldp x22, x23, [x0, #0xB8]",
+            "ldp x24, x25, [x0, #0xC8]",
+            "ldp x26, x27, [x0, #0xD8]",
+            "ldp x28, x29, [x0, #0xE8]",
+            "ldr x30, [x0, #0xF8]",
+            // Load x1 last (after we're done using x0 as base)
+            "ldr x1, [x0, #0x10]",
+            // Load sp from ctx->sp
+            "ldr x17, [x0, #0x100]",
+            "mov sp, x17",
+            // Load pc from ctx->pc into x17 (reusing the scratch register)
+            "ldr x17, [x0, #0x108]",
+            // Set x0 = 0 (return value; not restored from ctx)
+            "mov x0, xzr",
+            // Branch to saved pc
+            "br x17",
+            in("x0") core::ptr::from_ref(ctx),
             options(noreturn)
         )
     };
@@ -193,7 +240,18 @@ unsafe fn do_clone_process(ctx: &ucontext, event: &ShimEventAddThreadReq) -> i64
                 // signal handler to an updated context.
                 ExecutionContext::Application.enter_without_restorer();
                 let mut mctx = ctx.uc_mcontext;
-                mctx.rsp = child_stack as u64;
+                // Set the stack pointer in the saved context.
+                // On x86-64, the sigcontext field is `rsp`.
+                // On ARM64, bindgen may name it differently; write directly to offset 0x100.
+                #[cfg(target_arch = "x86_64")]
+                { mctx.rsp = child_stack as u64; }
+                #[cfg(target_arch = "aarch64")]
+                {
+                    // ARM64 sigcontext layout: regs[31] at offset 0x8, sp at offset 0x100
+                    let sp_offset = 0x100usize;
+                    let mctx_ptr: *mut u8 = (&raw mut mctx).cast::<u8>();
+                    unsafe { mctx_ptr.add(sp_offset).cast::<u64>().write(child_stack as u64); }
+                }
                 unsafe { set_context(&mctx) };
             }
             0
@@ -227,7 +285,7 @@ unsafe fn do_clone_thread(ctx: &ucontext, event: &ShimEventAddThreadReq) -> i64 
         "clone without a new stack not implemented"
     );
 
-    // x86-64 calling conventions require a 16-byte aligned stack
+    // x86-64 and ARM64 both require a 16-byte aligned stack
     assert_eq!(
         child_stack.align_offset(16),
         0,
@@ -244,7 +302,15 @@ unsafe fn do_clone_thread(ctx: &ucontext, event: &ShimEventAddThreadReq) -> i64 
 
     // Update child's copy of context to use the child's stack.
     let child_sigctx = unsafe { child_sigcontext.as_mut().unwrap() };
-    child_sigctx.rsp = child_stack as u64;
+    #[cfg(target_arch = "x86_64")]
+    { child_sigctx.rsp = child_stack as u64; }
+    #[cfg(target_arch = "aarch64")]
+    {
+        // ARM64 sigcontext layout: regs[31] at offset 0x8, sp at offset 0x100
+        let sp_offset = 0x100usize;
+        let mctx_ptr: *mut u8 = (&raw mut *child_sigctx).cast::<u8>();
+        unsafe { mctx_ptr.add(sp_offset).cast::<u64>().write(child_stack as u64); }
+    }
 
     // Copy child's IPC block to child's stack
     let child_current_rsp =
@@ -279,6 +345,7 @@ unsafe fn do_clone_thread(ctx: &ucontext, event: &ShimEventAddThreadReq) -> i64 
     // parent and child thread resume execution there. (The parent thread
     // resumes execution there after returning from the seccomp signal handler
     // normally).
+    #[cfg(target_arch = "x86_64")]
     unsafe {
         core::arch::asm!(
             // Make the clone syscall
@@ -332,6 +399,60 @@ unsafe fn do_clone_thread(ctx: &ucontext, event: &ShimEventAddThreadReq) -> i64 
             // callee-saved register
             in("r12") child_sigcontext as * const _,
             set_context = sym set_context,
+        )
+    }
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        core::arch::asm!(
+            // Make the clone syscall.
+            "svc #0",
+
+            // If in the parent (x0 != 0), exit the asm block.
+            "cbz x0, 3f",
+            "b 2f",
+            "3:",
+
+            // === Child path ===
+
+            // Save persistent values on the child stack before calling functions.
+            // x24 = exe_ctx_shadow, x25 = exe_ctx_application,
+            // x26 = ipc_blk, x27 = child_sigcontext (all callee-saved)
+
+            // Set the current context to shadow
+            "mov x0, x24",
+            "bl {shim_swapExecutionContext}",
+
+            // Initialize the IPC block for this thread
+            "mov x0, x26",
+            "bl {tls_ipc_set}",
+
+            // Initialize state for this thread
+            "bl {shim_init_thread}",
+
+            // Set the current context to application
+            "mov x0, x25",
+            "bl {shim_swapExecutionContext}",
+
+            // Set CPU state from ctx
+            "mov x0, x27",
+            "bl {set_context}",
+
+            "2:",
+            inout("x0") flags.bits() => rv,
+            in("x8") libc::SYS_clone,
+            in("x1") child_current_rsp,
+            in("x2") ptid,
+            in("x3") ctid,
+            in("x4") newtls,
+            in("x24") crate::EXECUTION_CONTEXT_SHADOW_CONST as usize,
+            in("x25") crate::EXECUTION_CONTEXT_APPLICATION_CONST as usize,
+            in("x26") child_ipc_blk as *const ShMemBlockSerialized as usize,
+            in("x27") child_sigcontext as * const _,
+            shim_swapExecutionContext = sym crate::export::shim_swapExecutionContext,
+            tls_ipc_set = sym tls_ipc_set,
+            shim_init_thread = sym crate::init_thread,
+            set_context = sym set_context,
+            clobber_abi("C"),
         )
     }
     rv

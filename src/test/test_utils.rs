@@ -451,17 +451,13 @@ macro_rules! ensure_ord {
     };
 }
 
-/// Convert a `&[u8]` to `&[i8]`. Useful when making C syscalls.
-pub fn u8_to_i8_slice(s: &[u8]) -> &[i8] {
-    // assume that if try_from() was successful, then a direct cast would also be
-    assert!(s.iter().all(|x| i8::try_from(*x).is_ok()));
-    unsafe { std::slice::from_raw_parts(s.as_ptr() as *const i8, s.len()) }
+/// Convert a `&[u8]` to `&[c_char]`. Useful when making C syscalls.
+pub fn u8_to_i8_slice(s: &[u8]) -> &[core::ffi::c_char] {
+    unsafe { std::slice::from_raw_parts(s.as_ptr() as *const core::ffi::c_char, s.len()) }
 }
 
-/// Convert a `&[i8]` to `&[u8]`. Useful when making C syscalls.
-pub fn i8_to_u8_slice(s: &[i8]) -> &[u8] {
-    // assume that if try_from() was successful, then a direct cast would also be
-    assert!(s.iter().all(|x| u8::try_from(*x).is_ok()));
+/// Convert a `&[c_char]` to `&[u8]`. Useful when making C syscalls.
+pub fn i8_to_u8_slice(s: &[core::ffi::c_char]) -> &[u8] {
     unsafe { std::slice::from_raw_parts(s.as_ptr() as *const u8, s.len()) }
 }
 

@@ -1,3 +1,4 @@
+#ifdef __x86_64__
 #include "lib/tsc/tsc.h"
 
 #include <cpuid.h>
@@ -131,3 +132,11 @@ int main(int argc, char* argv[]) {
 
     return g_test_run();
 }
+#else // __x86_64__ not defined
+#include <stdio.h>
+int main(int argc, char* argv[]) {
+    (void)argc; (void)argv;
+    printf("tsc_test skipped on non-x86-64\n");
+    return 0;
+}
+#endif

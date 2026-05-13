@@ -40,16 +40,14 @@ uint64_t shim_sys_get_simtime_nanos() {
 static CSimulationTime _shim_sys_latency_for_syscall(long n) {
     switch (n) {
         case SYS_clock_gettime:
+#ifdef SYS_time
         case SYS_time:
+#endif
         case SYS_gettimeofday:
+#ifdef SYS_getcpu
         case SYS_getcpu:
+#endif
             // This would typically be a VDSO call outside of Shadow.
-            //
-            // It might not be, if the caller directly used a `syscall`
-            // instruction or function call, but this is unusual, and charging
-            // too-little latency here shouldn't hurt much, given that its main
-            // purpose is currently to escape busy loops rather than to fully
-            // model CPU time.
             return shimshmem_unblockedVdsoLatency(shim_hostSharedMem());
     }
     // This would typically *not* be a VDSO call outside of Shadow, even if
@@ -95,6 +93,7 @@ bool shim_sys_handle_syscall_locally(long syscall_num, long* rv, va_list args) {
             break;
         }
 
+#ifdef SYS_time
         case SYS_time: {
             syscallName = "time";
 
@@ -113,6 +112,7 @@ bool shim_sys_handle_syscall_locally(long syscall_num, long* rv, va_list args) {
 
             break;
         }
+#endif
 
         case SYS_gettimeofday: {
             syscallName = "gettimeofday";

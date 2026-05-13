@@ -271,10 +271,33 @@ pub unsafe fn clone3(args: &clone_args) -> Result<CloneResult, Errno> {
 ///
 /// * The child shares file descriptors (and underlying file descriptions) with the parent.
 /// * The child is the only thread in the new process.
+#[cfg(target_arch = "x86_64")]
 pub unsafe fn fork_raw() -> Result<core::ffi::c_long, Errno> {
     unsafe { linux_syscall::syscall!(linux_syscall::SYS_fork) }
         .try_i64()
         .map_err(Errno::from)
+}
+
+#[cfg(target_arch = "aarch64")]
+pub unsafe fn fork_raw() -> Result<core::ffi::c_long, Errno> {
+    // ARM64 doesn't have a fork syscall; use clone(SIGCHLD) instead.
+    let flags = CloneFlags::empty().bits();
+    let child_stack: usize = 0;
+    let ptid: *mut i32 = core::ptr::null_mut();
+    let ctid: *mut i32 = core::ptr::null_mut();
+    let newtls: usize = 0;
+    unsafe {
+        linux_syscall::syscall!(
+            linux_syscall::SYS_clone,
+            flags,
+            child_stack,
+            ptid,
+            ctid,
+            newtls
+        )
+    }
+    .try_i64()
+    .map_err(Errno::from)
 }
 
 /// # Safety

@@ -18,7 +18,12 @@ set -xeuo pipefail
 LINUX_TAG=v7.0
 
 LINUX_REPO=https://github.com/torvalds/linux.git
-ARCH=x86_64
+ARCH=$(uname -m)
+case "$ARCH" in
+  x86_64) ARCH=x86 ;;
+  aarch64) ARCH=arm64 ;;
+  *) echo "Unsupported architecture: $ARCH" >&2; exit 1 ;;
+esac
 
 BUILDDIR="$(pwd)/bindings-build"
 LINUX_SRC_DIR="$BUILDDIR/linux-src"

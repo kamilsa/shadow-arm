@@ -1,5 +1,7 @@
 import urllib.request
 import subprocess
+import platform
+import re
 
 '''
 This script is meant to generate our interpose list containing all x86_64
@@ -10,7 +12,13 @@ than using seccomp to interpose, so we should use preloading whenever possible.
 
 # Defines the latest syscalls.
 # See also https://github.com/torvalds/linux/tree/master/arch/x86/entry/syscalls
-syscall_tbl = 'https://raw.githubusercontent.com/torvalds/linux/master/arch/x86/entry/syscalls/syscall_64.tbl'
+ARCH = platform.machine()
+if ARCH == 'x86_64':
+    syscall_tbl = 'https://raw.githubusercontent.com/torvalds/linux/master/arch/x86/entry/syscalls/syscall_64.tbl'
+elif ARCH == 'aarch64':
+    syscall_tbl = 'https://raw.githubusercontent.com/torvalds/linux/master/include/uapi/asm-generic/unistd.h'
+else:
+    raise Exception(f'Unsupported architecture: {ARCH}')
 
 # libc wrappers which use a different syscall
 remap = {}
@@ -207,23 +215,35 @@ with urllib.request.urlopen(syscall_tbl) as response:
 
 syscalls = {}
 
-for line in data.splitlines():
-    parts = line.split()
+if ARCH == 'x86_64':
+    for line in data.splitlines():
+        parts = line.split()
 
-    # ignore comments and incomplete lines
-    if len(parts) < 4 or '#' in parts[0]:
-        continue
+        # ignore comments and incomplete lines
+        if len(parts) < 4 or '#' in parts[0]:
+            continue
 
-    # Most lines contain only these 4 fields.
-    # Some contain additional trailing fields we don't care about
-    # ("-  noreturn"), which we drop.
-    num, abi, name, entry = parts[:4]
+        # Most lines contain only these 4 fields.
+        # Some contain additional trailing fields we don't care about
+        # ("-  noreturn"), which we drop.
+        num, abi, name, entry = parts[:4]
 
-    # ignore the x32-specific abi, since shadow only supports x86_64
-    if 'x32' in abi:
-        continue
+        # ignore the x32-specific abi, since shadow only supports x86_64
+        if 'x32' in abi:
+            continue
 
-    syscalls[str(name)] = [num, str(entry)]
+        syscalls[str(name)] = [num, str(entry)]
+elif ARCH == 'aarch64':
+    # ARM64: parse #define __NR_* from asm-generic/unistd.h
+    for line in data.splitlines():
+        # Match: #define __NR_<name> <number>
+        m = re.match(r'#define\s+__NR_(\w+)\s+(\d+)', line)
+        if m:
+            name, num = m.group(1), int(m.group(2))
+            # Skip non-syscall defines (e.g. __NR_syscalls, __NR_arch_specific_syscall)
+            if name in ('syscalls', 'arch_specific_syscall'):
+                continue
+            syscalls[name] = [num, name]
 
 header = \
 '''/// This file is generated with the 'gen_syscall_wrappers_c.py' script and in

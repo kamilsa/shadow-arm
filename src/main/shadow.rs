@@ -427,6 +427,7 @@ fn disable_aslr() -> anyhow::Result<()> {
     Ok(())
 }
 
+#[cfg(target_arch = "x86_64")]
 fn sidechannel_mitigations_enabled() -> anyhow::Result<bool> {
     let state = nix::errno::Errno::result(unsafe {
         libc::prctl(
@@ -440,6 +441,12 @@ fn sidechannel_mitigations_enabled() -> anyhow::Result<bool> {
     .context("Failed prctl()")?;
     let state = state as u32;
     Ok((state & libc::PR_SPEC_DISABLE) != 0)
+}
+
+#[cfg(target_arch = "aarch64")]
+fn sidechannel_mitigations_enabled() -> anyhow::Result<bool> {
+    // ARM64 doesn't have the x86 speculation control prctls.
+    Ok(false)
 }
 
 fn log_environment(args: Vec<&OsStr>) {

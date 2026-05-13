@@ -23,7 +23,12 @@ void utility_handleError(const char* file, int line, const char* function, const
                          ...) {
     va_list vargs;
     va_start(vargs, message);
+#ifdef __aarch64__
+    // On ARM64, va_list is a struct type; pass a pointer to it.
+    utility_handleErrorInner(file, line, function, message, (void*)&vargs);
+#else
     utility_handleErrorInner(file, line, function, message, vargs);
+#endif
     va_end(vargs);
 }
 

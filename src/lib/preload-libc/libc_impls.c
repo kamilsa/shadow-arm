@@ -224,7 +224,11 @@ int open(const char* pathname, int flags, ...) {
         mode = 0;
     }
 
-    return (int)syscall(SYS_open, pathname, flags, mode);
+    #ifdef SYS_open
+	return (int)syscall(SYS_open, pathname, flags, mode);
+#else
+	return (int)syscall(SYS_openat, AT_FDCWD, pathname, flags, mode);
+#endif
 }
 
 int openat(int dirfd, const char* pathname, int flags, ...) {

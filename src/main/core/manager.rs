@@ -193,7 +193,9 @@ impl<'a> Manager<'a> {
         let meminfo_file =
             std::fs::File::open("/proc/meminfo").context("Failed to open '/proc/meminfo'")?;
 
-        // Determind whether we can and should emulate cpuid in the shim.
+        // Determine whether we can and should emulate cpuid in the shim.
+        // On ARM64, there is no cpuid instruction, so emulation is never needed.
+        #[cfg(target_arch = "x86_64")]
         let emulate_cpuid = {
             let supports_rdrand = asm_util::cpuid::supports_rdrand();
             let supports_rdseed = asm_util::cpuid::supports_rdseed();
@@ -231,6 +233,8 @@ impl<'a> Manager<'a> {
                 }
             }
         };
+        #[cfg(target_arch = "aarch64")]
+        let emulate_cpuid = false;
 
         let shmem = shadow_shmem::allocator::shmalloc(ManagerShmem {
             log_start_time_micros: unsafe { c::logger_get_global_start_time_micros() },

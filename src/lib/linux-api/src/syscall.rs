@@ -163,10 +163,12 @@ impl SyscallNum {
     pub const NR_mlockall: Self = Self::new(bindings::LINUX___NR_mlockall);
     pub const NR_munlockall: Self = Self::new(bindings::LINUX___NR_munlockall);
     pub const NR_vhangup: Self = Self::new(bindings::LINUX___NR_vhangup);
+    #[cfg(target_arch = "x86_64")]
     pub const NR_modify_ldt: Self = Self::new(bindings::LINUX___NR_modify_ldt);
     pub const NR_pivot_root: Self = Self::new(bindings::LINUX___NR_pivot_root);
     pub const NR__sysctl: Self = Self::new(bindings::LINUX___NR__sysctl);
     pub const NR_prctl: Self = Self::new(bindings::LINUX___NR_prctl);
+    #[cfg(target_arch = "x86_64")]
     pub const NR_arch_prctl: Self = Self::new(bindings::LINUX___NR_arch_prctl);
     pub const NR_adjtimex: Self = Self::new(bindings::LINUX___NR_adjtimex);
     pub const NR_setrlimit: Self = Self::new(bindings::LINUX___NR_setrlimit);
@@ -563,10 +565,12 @@ impl SyscallNum {
             Self::NR_mlockall => "mlockall",
             Self::NR_munlockall => "munlockall",
             Self::NR_vhangup => "vhangup",
+            #[cfg(target_arch = "x86_64")]
             Self::NR_modify_ldt => "modify_ldt",
             Self::NR_pivot_root => "pivot_root",
             Self::NR__sysctl => "_sysctl",
             Self::NR_prctl => "prctl",
+            #[cfg(target_arch = "x86_64")]
             Self::NR_arch_prctl => "arch_prctl",
             Self::NR_adjtimex => "adjtimex",
             Self::NR_setrlimit => "setrlimit",

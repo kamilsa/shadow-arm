@@ -308,19 +308,13 @@ pub fn return_code_for_signal(signal: nix::sys::signal::Signal) -> i32 {
     (signal as i32).checked_add(128).unwrap()
 }
 
-/// Convert a `&[u8]` to `&[i8]`. Useful when interacting with C strings. Panics if
-/// `i8::try_from(c)` fails for any `c` in the slice.
-pub fn u8_to_i8_slice(s: &[u8]) -> &[i8] {
-    // assume that if try_from() was successful, then a direct cast would also be
-    assert!(s.iter().all(|x| i8::try_from(*x).is_ok()));
-    unsafe { std::slice::from_raw_parts(s.as_ptr() as *const i8, s.len()) }
+/// Convert a `&[u8]` to `&[c_char]`. Useful when interacting with C strings.
+pub fn u8_to_i8_slice(s: &[u8]) -> &[core::ffi::c_char] {
+    unsafe { std::slice::from_raw_parts(s.as_ptr() as *const core::ffi::c_char, s.len()) }
 }
 
-/// Convert a `&[i8]` to `&[u8]`. Useful when interacting with C strings. Panics if
-/// `u8::try_from(c)` fails for any `c` in the slice.
-pub fn i8_to_u8_slice(s: &[i8]) -> &[u8] {
-    // assume that if try_from() was successful, then a direct cast would also be
-    assert!(s.iter().all(|x| u8::try_from(*x).is_ok()));
+/// Convert a `&[c_char]` to `&[u8]`. Useful when interacting with C strings.
+pub fn i8_to_u8_slice(s: &[core::ffi::c_char]) -> &[u8] {
     unsafe { std::slice::from_raw_parts(s.as_ptr() as *const u8, s.len()) }
 }
 
@@ -472,7 +466,10 @@ fn is_dynamic_bin(path: impl AsRef<std::path::Path>) -> bool {
     let path = path.as_ref();
 
     // check if the binary is dynamically linked
+    #[cfg(target_arch = "x86_64")]
     let ld_path = "/lib64/ld-linux-x86-64.so.2";
+    #[cfg(target_arch = "aarch64")]
+    let ld_path = "/lib/ld-linux-aarch64.so.1";
     let ld_output = std::process::Command::new(ld_path)
         .arg("--verify")
         .arg(path)

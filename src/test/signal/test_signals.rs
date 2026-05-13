@@ -1,3 +1,4 @@
+#[cfg(target_arch = "x86_64")]
 use std::arch::asm;
 use std::error::Error;
 use std::os::unix::io::RawFd;
@@ -942,6 +943,7 @@ fn test_sigaltstack_old_efault() -> Result<(), Box<dyn Error>> {
 }
 
 static GLOBAL_STATIC: u32 = 0xdeadbeef;
+#[cfg(target_arch = "x86_64")]
 extern "C" fn change_rax_from_null_to_global_static(
     signal: i32,
     info: *mut libc::siginfo_t,
@@ -960,6 +962,7 @@ extern "C" fn change_rax_from_null_to_global_static(
     ctx.uc_mcontext.gregs[libc::REG_RAX as usize] = std::ptr::from_ref(&GLOBAL_STATIC) as i64;
 }
 
+#[cfg(target_arch = "x86_64")]
 fn test_synchronous_sigsegv() -> Result<(), Box<dyn Error>> {
     // Ensure SIGSEGV isn't blocked.
     let mut sigset = signal::SigSet::empty();
@@ -1073,6 +1076,7 @@ fn test_hardware_error_signal<F: FnOnce()>(
     Ok(())
 }
 
+#[cfg(target_arch = "x86_64")]
 fn test_hardware_error_signals() -> Result<(), Box<dyn Error>> {
     //let signals = [Signal::SIGSEGV, Signal::SIGILL, Signal::SIGBUS, Signal::SIGFPE];
 
@@ -1128,6 +1132,7 @@ struct DoSetcontextHandlerResult {
 }
 static mut DO_SETCONTEXT_RES: Option<DoSetcontextHandlerResult> = None;
 
+#[cfg(target_arch = "x86_64")]
 extern "C" fn do_setcontext(
     _signal: i32,
     info: *mut libc::siginfo_t,
@@ -1169,6 +1174,7 @@ extern "C" fn do_setcontext(
 // preempt.  I'm unclear whether it ever uses `setcontext` or `swapcontext`
 // directly with that context object, but testing that doing so works seems like
 // a fairly strong test that the provided context is "valid".
+#[cfg(target_arch = "x86_64")]
 fn test_validate_context() -> Result<(), Box<dyn Error>> {
     // This is the signal that itimer generates.
     let sig = signal::SIGALRM;
@@ -1401,16 +1407,19 @@ fn main() -> Result<(), Box<dyn Error>> {
             test_restart_second,
             set![TestEnv::Shadow],
         ),
+        #[cfg(target_arch = "x86_64")]
         ShadowTest::new(
             "synchronous sigsegv",
             test_synchronous_sigsegv,
             all_envs.clone(),
         ),
+        #[cfg(target_arch = "x86_64")]
         ShadowTest::new(
             "hardware error signals",
             test_hardware_error_signals,
             all_envs.clone(),
         ),
+        #[cfg(target_arch = "x86_64")]
         ShadowTest::new("validate context", test_validate_context, all_envs),
     ];
 

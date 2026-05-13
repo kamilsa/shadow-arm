@@ -10,9 +10,13 @@
 #include "interpose.h"
 
 // libc functions that we want to turn into syscalls
+#ifdef SYS_creat
 INTERPOSE_REMAP(creat64, creat);
+#endif
 INTERPOSE_REMAP(fallocate64, fallocate);
 INTERPOSE_REMAP(__fcntl, fcntl);
 INTERPOSE_REMAP(fcntl64, fcntl);
 INTERPOSE_REMAP(mmap64, mmap);
+#ifdef SYS_open
 INTERPOSE_REMAP(open64, open);
+#endif

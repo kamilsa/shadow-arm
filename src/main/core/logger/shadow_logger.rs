@@ -109,7 +109,7 @@ thread_local!(static THREAD_NAME: String = get_thread_name());
 thread_local!(static THREAD_ID: nix::unistd::Pid = nix::unistd::gettid());
 
 fn get_thread_name() -> String {
-    let mut thread_name = Vec::<i8>::with_capacity(16);
+    let mut thread_name = Vec::<core::ffi::c_char>::with_capacity(16);
     let res = unsafe {
         thread_name.set_len(thread_name.capacity());
         // ~infallible when host_name is at least 16 bytes.

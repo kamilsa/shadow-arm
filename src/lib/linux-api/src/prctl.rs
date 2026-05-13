@@ -246,18 +246,36 @@ impl From<i32> for PrctlOp {
 }
 
 #[derive(PartialEq, Eq)]
-pub struct ArchPrctlOp(i32);
+pub struct ArchPrctlOp(pub(crate) i32);
 
 impl ArchPrctlOp {
+    const fn from_u32(val: u32) -> Self {
+        Self::new(const_conversions::i32_from_u32(val))
+    }
+
+    pub const fn new(val: i32) -> Self {
+        Self(val)
+    }
+
+    #[cfg(target_arch = "x86_64")]
     pub const ARCH_SET_CPUID: Self = Self::from_u32(bindings::LINUX_ARCH_SET_CPUID);
+    #[cfg(target_arch = "x86_64")]
     pub const ARCH_GET_CPUID: Self = Self::from_u32(bindings::LINUX_ARCH_GET_CPUID);
+    #[cfg(target_arch = "x86_64")]
     pub const ARCH_SET_FS: Self = Self::from_u32(bindings::LINUX_ARCH_SET_FS);
+    #[cfg(target_arch = "x86_64")]
     pub const ARCH_GET_FS: Self = Self::from_u32(bindings::LINUX_ARCH_GET_FS);
+    #[cfg(target_arch = "x86_64")]
     pub const ARCH_SET_GS: Self = Self::from_u32(bindings::LINUX_ARCH_SET_GS);
+    #[cfg(target_arch = "x86_64")]
     pub const ARCH_GET_GS: Self = Self::from_u32(bindings::LINUX_ARCH_GET_GS);
+    #[cfg(target_arch = "x86_64")]
     pub const ARCH_GET_XCOMP_SUPP: Self = Self::from_u32(bindings::LINUX_ARCH_GET_XCOMP_SUPP);
+    #[cfg(target_arch = "x86_64")]
     pub const ARCH_GET_XCOMP_PERM: Self = Self::from_u32(bindings::LINUX_ARCH_GET_XCOMP_PERM);
+    #[cfg(target_arch = "x86_64")]
     pub const ARCH_REQ_XCOMP_PERM: Self = Self::from_u32(bindings::LINUX_ARCH_REQ_XCOMP_PERM);
+    #[cfg(target_arch = "x86_64")]
     pub const ARCH_GET_XCOMP_GUEST_PERM: Self =
         Self::from_u32(bindings::LINUX_ARCH_GET_XCOMP_GUEST_PERM);
     pub const ARCH_REQ_XCOMP_GUEST_PERM: Self =
@@ -280,14 +298,7 @@ impl ArchPrctlOp {
     pub const ARCH_SHSTK_SHSTK: Self = Self::from_u32(bindings::LINUX_ARCH_SHSTK_SHSTK);
     pub const ARCH_SHSTK_WRSS: Self = Self::from_u32(bindings::LINUX_ARCH_SHSTK_WRSS);
 
-    pub const fn new(val: i32) -> Self {
-        Self(val)
-    }
-
-    const fn from_u32(val: u32) -> Self {
-        Self::new(const_conversions::i32_from_u32(val))
-    }
-
+    #[cfg(target_arch = "x86_64")]
     pub const fn to_str(&self) -> Option<&'static str> {
         match *self {
             Self::ARCH_SET_CPUID => Some("ARCH_SET_CPUID"),
@@ -329,29 +340,40 @@ impl From<ArchPrctlOp> for core::ffi::c_int {
 }
 
 impl core::fmt::Display for ArchPrctlOp {
+    #[cfg(target_arch = "x86_64")]
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
         match self.to_str() {
             Some(s) => formatter.write_str(s),
             None => write!(formatter, "(unknown arch_prctl option {})", self.0),
         }
     }
+    #[cfg(target_arch = "aarch64")]
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
+        write!(formatter, "(arch_prctl option {})", self.0)
+    }
 }
 
 impl core::fmt::Debug for ArchPrctlOp {
+    #[cfg(target_arch = "x86_64")]
     fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
         match self.to_str() {
             Some(s) => write!(formatter, "ArchPrctlOp::{s}"),
             None => write!(formatter, "ArchPrctlOp::<{}>", self.0),
         }
     }
+    #[cfg(target_arch = "aarch64")]
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> Result<(), core::fmt::Error> {
+        write!(formatter, "ArchPrctlOp::<{}>", self.0)
+    }
 }
 
-/// Execute the `arch_prctl` syscall.
+/// Execute the `arch_prctl` syscall. x86-64 only.
 ///
 /// # Safety
 ///
 /// Some operations may change OS behavior in a way that violates assumptions
 /// that other code relies on.
+#[cfg(target_arch = "x86_64")]
 pub unsafe fn arch_prctl_raw(
     option: core::ffi::c_int,
     arg2: core::ffi::c_ulong,
@@ -361,12 +383,13 @@ pub unsafe fn arch_prctl_raw(
         .map_err(Errno::from)
 }
 
-/// Execute the `arch_prctl` syscall.
+/// Execute the `arch_prctl` syscall. x86-64 only.
 ///
 /// # Safety
 ///
 /// Some operations may change OS behavior in a way that violates assumptions
 /// that other code relies on.
+#[cfg(target_arch = "x86_64")]
 pub unsafe fn arch_prctl(option: ArchPrctlOp, arg2: u64) -> Result<i64, Errno> {
     unsafe { arch_prctl_raw(option.into(), arg2) }
 }

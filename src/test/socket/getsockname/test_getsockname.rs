@@ -405,7 +405,7 @@ fn test_bound_socket(domain: libc::c_int, sock_type: libc::c_int) -> Result<(), 
         libc::AF_UNIX => {
             let mut addr = libc::sockaddr_un {
                 sun_family: libc::AF_UNIX as u16,
-                sun_path: [0i8; 108],
+                sun_path: [0 as core::ffi::c_char; 108],
             };
             // arbitrary abstract socket name
             addr.sun_path[1] = 4;
@@ -473,7 +473,7 @@ fn test_autobound_socket(domain: libc::c_int, sock_type: libc::c_int) -> Result<
         libc::AF_UNIX => (
             SockAddr::Unix(libc::sockaddr_un {
                 sun_family: libc::AF_UNIX as u16,
-                sun_path: [0i8; 108],
+                sun_path: [0 as core::ffi::c_char; 108],
             }),
             2,
         ),
@@ -558,7 +558,7 @@ fn test_after_close(domain: libc::c_int, sock_type: libc::c_int) -> Result<(), S
         libc::AF_UNIX => {
             let mut addr = libc::sockaddr_un {
                 sun_family: libc::AF_UNIX as u16,
-                sun_path: [0i8; 108],
+                sun_path: [0 as core::ffi::c_char; 108],
             };
             // arbitrary abstract socket name
             addr.sun_path[1] = 4;
@@ -616,7 +616,7 @@ fn test_bound_connected_socket(domain: libc::c_int, sock_type: libc::c_int) -> R
         libc::AF_UNIX => {
             let mut addr = libc::sockaddr_un {
                 sun_family: libc::AF_UNIX as u16,
-                sun_path: [0i8; 108],
+                sun_path: [0 as core::ffi::c_char; 108],
             };
             // arbitrary abstract socket name
             addr.sun_path[1] = 4;

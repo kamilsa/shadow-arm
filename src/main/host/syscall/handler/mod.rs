@@ -370,6 +370,7 @@ impl SyscallHandler {
             //
             SyscallNum::NR_accept => handle!(accept),
             SyscallNum::NR_accept4 => handle!(accept4),
+            #[cfg(target_arch = "x86_64")]
             SyscallNum::NR_arch_prctl => handle!(arch_prctl),
             SyscallNum::NR_alarm => handle!(alarm),
             SyscallNum::NR_bind => handle!(bind),

@@ -116,10 +116,39 @@ unsafe impl vasi::VirtualAddressSpaceIndependent for kernel_old_itimerval {}
 /// Raw `alarm` syscall. Permits u64 arg and return value for generality with
 /// the general syscall ABI, but note that the `alarm` syscall definition itself
 /// uses u32.
+#[cfg(target_arch = "x86_64")]
 pub fn alarm_raw(secs: u64) -> Result<u64, Errno> {
     unsafe { syscall!(linux_syscall::SYS_alarm, secs) }
         .try_u64()
         .map_err(Errno::from)
+}
+
+/// ARM64 doesn't have an `alarm` syscall. Use `setitimer` with ITIMER_REAL instead.
+#[cfg(target_arch = "aarch64")]
+pub fn alarm_raw(secs: u64) -> Result<u64, Errno> {
+    use crate::bindings::linux_itimerval;
+    let mut old: linux_itimerval = unsafe { core::mem::zeroed() };
+    let mut new: linux_itimerval = unsafe { core::mem::zeroed() };
+    new.it_value.tv_sec = secs as i64;
+    new.it_value.tv_usec = 0;
+    let rv = unsafe {
+        syscall!(
+            linux_syscall::SYS_setitimer,
+            bindings::LINUX_ITIMER_REAL as u64,
+            &new as *const linux_itimerval as u64,
+            &mut old as *mut linux_itimerval as u64
+        )
+    };
+    if let Err(e) = rv.try_i64().map_err(Errno::from) {
+        return Err(e);
+    }
+    // Return remaining seconds from the old timer (rounded up).
+    let remaining = old.it_value.tv_sec as u64;
+    if old.it_value.tv_usec > 0 {
+        Ok(remaining + 1)
+    } else {
+        Ok(remaining)
+    }
 }
 
 /// Make an `alarm` syscall.

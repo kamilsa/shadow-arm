@@ -19,7 +19,7 @@ use rustix::fd::{AsFd, AsRawFd};
 use test_utils::{ShadowTest, set};
 use test_utils::{TestEnvironment as TestEnv, ensure_ord, running_in_shadow};
 
-fn execv_argvec(args: &[impl AsRef<CStr>]) -> Vec<*const i8> {
+fn execv_argvec(args: &[impl AsRef<CStr>]) -> Vec<*const core::ffi::c_char> {
     args.iter()
         .map(|c| c.as_ref().as_ptr())
         .chain(std::iter::once(std::ptr::null()))
@@ -1791,6 +1791,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 }
             }),
         ),
+        #[cfg(target_arch = "x86_64")]
         (
             "vfork_exec",
             Arc::new(|path: &Path, args: &[&str]| {
@@ -1834,6 +1835,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                     )
                 };
                 Pid::from_raw(raw_pid.try_into().unwrap()).unwrap()
+            }),
+        ),
+        #[cfg(target_arch = "aarch64")]
+        (
+            "vfork_exec",
+            Arc::new(|_path: &Path, _args: &[&str]| -> Pid {
+                panic!("vfork_exec test not yet ported to ARM64");
             }),
         ),
         (

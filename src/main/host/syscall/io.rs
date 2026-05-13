@@ -428,7 +428,7 @@ fn msghdr_to_rust(msg: &libc::msghdr, mem: &MemoryManager) -> Result<MsgHdr, Err
 /// environment string lists.
 pub fn read_cstring_vec(
     mem: &MemoryManager,
-    mut ptr_ptr: ForeignPtr<ForeignPtr<i8>>,
+    mut ptr_ptr: ForeignPtr<ForeignPtr<core::ffi::c_char>>,
 ) -> Result<Vec<CString>, Errno> {
     let mut res = Vec::new();
 

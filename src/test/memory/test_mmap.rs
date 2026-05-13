@@ -365,8 +365,15 @@ fn test_mmap_mprotect_exe() -> Result<(), Box<dyn Error>> {
     };
     test_utils::assert_true_else_errno(buf_ptr != libc::MAP_FAILED);
 
-    // Write a single x86-64 `ret` instruction
-    unsafe { *(buf_ptr as *mut u8) = 0xc3 };
+    // Write a `ret` instruction for the current architecture
+    #[cfg(target_arch = "x86_64")]
+    unsafe { *(buf_ptr as *mut u8) = 0xc3 }; // x86-64: ret
+    #[cfg(target_arch = "aarch64")]
+    unsafe {
+        // ARM64: ret (0xd65f03c0 encoded as little-endian)
+        let ret_insn: [u8; 4] = [0xc0, 0x03, 0x5f, 0xd6];
+        std::ptr::copy_nonoverlapping(ret_insn.as_ptr(), buf_ptr as *mut u8, 4);
+    }
 
     // Update protections to make it RX.
     let rv = unsafe { libc::mprotect(buf_ptr, size, libc::PROT_READ | libc::PROT_EXEC) };

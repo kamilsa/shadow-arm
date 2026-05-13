@@ -171,8 +171,11 @@ unsafe impl Pod for libc::__c_anonymous_sockaddr_can_j1939 {}
 unsafe impl Pod for libc::__c_anonymous_sockaddr_can_tp {}
 unsafe impl Pod for libc::__exit_status {}
 unsafe impl Pod for libc::__timeval {}
+#[cfg(target_arch = "x86_64")]
 unsafe impl Pod for libc::_libc_fpstate {}
+#[cfg(target_arch = "x86_64")]
 unsafe impl Pod for libc::_libc_fpxreg {}
+#[cfg(target_arch = "x86_64")]
 unsafe impl Pod for libc::_libc_xmmreg {}
 unsafe impl Pod for libc::addrinfo {}
 //unsafe impl Pod for libc::af_alg_i {}
@@ -316,8 +319,11 @@ unsafe impl Pod for libc::uinput_ff_erase {}
 unsafe impl Pod for libc::uinput_ff_upload {}
 unsafe impl Pod for libc::uinput_setup {}
 unsafe impl Pod for libc::uinput_user_dev {}
+#[cfg(target_arch = "x86_64")]
 unsafe impl Pod for libc::user {}
+#[cfg(target_arch = "x86_64")]
 unsafe impl Pod for libc::user_fpregs_struct {}
+#[cfg(target_arch = "x86_64")]
 unsafe impl Pod for libc::user_regs_struct {}
 unsafe impl Pod for libc::utimbuf {}
 unsafe impl Pod for libc::utmpx {}

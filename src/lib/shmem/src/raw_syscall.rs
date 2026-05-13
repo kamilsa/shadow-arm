@@ -28,7 +28,8 @@ fn null_terminated(string: &[u8]) -> bool {
 /// # Safety
 ///
 /// Assumes filename is a null-terminated ASCII string and that flags and mode are valid as defined
-/// by the x86-64 system call interface.
+/// by the system call interface.
+#[cfg(target_arch = "x86_64")]
 pub unsafe fn open(
     filename: &[u8],
     flags: linux_api::fcntl::OFlag,
@@ -50,6 +51,30 @@ pub unsafe fn open(
     Ok(rc.as_u64_unchecked() as i32)
 }
 
+/// ARM64 doesn't have SYS_open; use openat(AT_FDCWD, ...) instead.
+#[cfg(target_arch = "aarch64")]
+pub unsafe fn open(
+    filename: &[u8],
+    flags: linux_api::fcntl::OFlag,
+    mode: u32,
+) -> Result<i32, Errno> {
+    assert!(null_terminated(filename));
+
+    let rc = unsafe {
+        syscall!(
+            linux_syscall::SYS_openat,
+            -100i64, // AT_FDCWD
+            filename.as_ptr(),
+            flags.bits(),
+            mode
+        )
+    };
+
+    rc.check().map_err(Errno::from)?;
+
+    Ok(rc.as_u64_unchecked() as i32)
+}
+
 pub fn close(fd: i32) -> Result<(), Errno> {
     unsafe { syscall!(linux_syscall::SYS_close, fd) }
         .check()
@@ -59,12 +84,30 @@ pub fn close(fd: i32) -> Result<(), Errno> {
 /// # Safety
 ///
 /// Assumes filename is a null-terminated ASCII string.
+#[cfg(target_arch = "x86_64")]
 pub unsafe fn unlink(filename: &[u8]) -> Result<(), Errno> {
     assert!(null_terminated(filename));
 
     unsafe { syscall!(linux_syscall::SYS_unlink, filename.as_ptr()) }
         .check()
         .map_err(Errno::from)
+}
+
+/// ARM64 doesn't have SYS_unlink; use unlinkat(AT_FDCWD, ...) instead.
+#[cfg(target_arch = "aarch64")]
+pub unsafe fn unlink(filename: &[u8]) -> Result<(), Errno> {
+    assert!(null_terminated(filename));
+
+    unsafe {
+        syscall!(
+            linux_syscall::SYS_unlinkat,
+            -100i64, // AT_FDCWD
+            filename.as_ptr(),
+            0u64
+        )
+    }
+    .check()
+    .map_err(Errno::from)
 }
 
 /// # Safety

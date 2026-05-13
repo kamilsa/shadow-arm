@@ -593,13 +593,13 @@ impl ManagedThread {
         // envv. It *probably* doesn't actually mutate them, but we
         // conservatively give it what it asks for. We have to "reconstitute"
         // the CString's after the fork + exec to deallocate them.
-        let argv_ptrs: Vec<*mut i8> = argv
+        let argv_ptrs: Vec<*mut core::ffi::c_char> = argv
             .into_iter()
             .map(CString::into_raw)
             // the last element of argv must be NULL
             .chain(std::iter::once(std::ptr::null_mut()))
             .collect();
-        let envv_ptrs: Vec<*mut i8> = envv
+        let envv_ptrs: Vec<*mut core::ffi::c_char> = envv
             .into_iter()
             .map(CString::into_raw)
             // the last element of argv must be NULL

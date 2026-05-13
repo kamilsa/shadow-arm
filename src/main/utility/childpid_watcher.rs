@@ -223,7 +223,13 @@ impl ChildPidWatcher {
     /// Still, there may be some dragons here. Best to call exec before too long
     /// in the child.
     pub unsafe fn fork_watchable(&self, child_fn: impl FnOnce()) -> Result<Pid, Errno> {
+        #[cfg(target_arch = "x86_64")]
         let raw_pid = Errno::result_from_libc_errno(-1, unsafe { libc::syscall(libc::SYS_fork) })?;
+        #[cfg(target_arch = "aarch64")]
+        let raw_pid = Errno::result_from_libc_errno(-1, unsafe {
+            // ARM64: no fork syscall, use clone(SIGCHLD) instead
+            libc::syscall(libc::SYS_clone, libc::SIGCHLD as u64, 0u64, 0u64, 0u64, 0u64)
+        })?;
         if raw_pid == 0 {
             child_fn();
             panic!("child_fn shouldn't have returned");

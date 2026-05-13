@@ -539,14 +539,14 @@ where
 
 impl<T> Eq for SockaddrUnix<T> where T: Borrow<libc::sockaddr_un> {}
 
-/// Convert a `&[u8]` to `&[i8]`.
-fn u8_to_i8_slice(s: &[u8]) -> &[i8] {
-    unsafe { std::slice::from_raw_parts(s.as_ptr() as *const i8, s.len()) }
+/// Convert a `&[c_char]` to `&[u8]`.
+fn i8_to_u8_slice(s: &[core::ffi::c_char]) -> &[u8] {
+    unsafe { std::slice::from_raw_parts(s.as_ptr() as *const u8, s.len()) }
 }
 
-/// Convert a `&[i8]` to `&[u8]`.
-fn i8_to_u8_slice(s: &[i8]) -> &[u8] {
-    unsafe { std::slice::from_raw_parts(s.as_ptr() as *const u8, s.len()) }
+/// Convert a `&[u8]` to `&[c_char]`.
+fn u8_to_i8_slice(s: &[u8]) -> &[core::ffi::c_char] {
+    unsafe { std::slice::from_raw_parts(s.as_ptr() as *const core::ffi::c_char, s.len()) }
 }
 
 #[cfg(test)]

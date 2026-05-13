@@ -135,9 +135,9 @@ impl<const N: usize> FormatBuffer<N> {
         //
         // Meanwhile, this stack allocation is ~free... as long as we don't
         // overflow the stack.
-        let mut buf = [MaybeUninit::<i8>::uninit(); N];
+        let mut buf = [MaybeUninit::<core::ffi::c_char>::uninit(); N];
 
-        let rv = unsafe { vsnprintf(buf.as_mut_ptr() as *mut i8, buf.len(), fmt.as_ptr(), args) };
+        let rv = unsafe { vsnprintf(buf.as_mut_ptr() as *mut core::ffi::c_char, buf.len(), fmt.as_ptr(), args) };
 
         // Number of non-NULL bytes for the fully formatted string.
         let formatted_len = match usize::try_from(rv) {
@@ -149,7 +149,7 @@ impl<const N: usize> FormatBuffer<N> {
 
         // we use a hyper-local helper function to ensure that the new slice has the correct lifetime.
         // <https://doc.rust-lang.org/std/slice/fn.from_raw_parts.html#caveat>
-        unsafe fn transmute_to_u8(buf: &[MaybeUninit<i8>]) -> &[u8] {
+        unsafe fn transmute_to_u8(buf: &[MaybeUninit<core::ffi::c_char>]) -> &[u8] {
             unsafe { core::slice::from_raw_parts(buf.as_ptr() as *const u8, buf.len()) }
         }
 

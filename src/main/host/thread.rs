@@ -395,15 +395,21 @@ impl Thread {
         flags: i32,
         mode: i32,
     ) -> Result<i32, Errno> {
-        let res = self.native_syscall(
-            ctx,
-            libc::SYS_open,
-            &[
-                SyscallReg::from(pathname),
-                SyscallReg::from(flags),
-                SyscallReg::from(mode),
-            ],
-        );
+        #[cfg(target_arch = "x86_64")]
+        let (sys_num, args): (i64, &[SyscallReg]) = (libc::SYS_open.into(), &[
+            SyscallReg::from(pathname),
+            SyscallReg::from(flags),
+            SyscallReg::from(mode),
+        ]);
+        #[cfg(target_arch = "aarch64")]
+        let (sys_num, args): (i64, &[SyscallReg]) = (libc::SYS_openat.into(), &[
+            SyscallReg::from(-100i32),
+            SyscallReg::from(pathname),
+            SyscallReg::from(flags),
+            SyscallReg::from(mode),
+        ]);
+
+        let res = self.native_syscall(ctx, sys_num, args);
         Ok(i32::from(res?))
     }
 

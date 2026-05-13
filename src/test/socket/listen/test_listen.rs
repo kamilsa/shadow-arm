@@ -87,7 +87,7 @@ fn get_tests() -> Vec<test_utils::ShadowTest<(), String>> {
                 None,
                 Some(SockAddr::Unix(libc::sockaddr_un {
                     sun_family: libc::AF_UNIX as u16,
-                    sun_path: [0i8; 108],
+                    sun_path: [0 as core::ffi::c_char; 108],
                 })),
             ],
             _ => unimplemented!(),

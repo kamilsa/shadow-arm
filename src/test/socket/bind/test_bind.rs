@@ -638,7 +638,7 @@ fn test_double_bind_socket(
         libc::AF_UNIX => {
             let mut addr = libc::sockaddr_un {
                 sun_family: libc::AF_UNIX as u16,
-                sun_path: [0i8; 108],
+                sun_path: [0 as core::ffi::c_char; 108],
             };
             // arbitrary abstract socket name
             addr.sun_path[1] = 5;
@@ -687,7 +687,7 @@ fn test_double_bind_address(
         libc::AF_UNIX => {
             let mut addr = libc::sockaddr_un {
                 sun_family: libc::AF_UNIX as u16,
-                sun_path: [0i8; 108],
+                sun_path: [0 as core::ffi::c_char; 108],
             };
             // arbitrary abstract socket name
             addr.sun_path[1] = 5;
@@ -798,7 +798,7 @@ fn test_autobind(
         libc::AF_UNIX => {
             let addr = libc::sockaddr_un {
                 sun_family: libc::AF_UNIX as u16,
-                sun_path: [0i8; 108],
+                sun_path: [0 as core::ffi::c_char; 108],
             };
             (SockAddr::Unix(addr), 2)
         }

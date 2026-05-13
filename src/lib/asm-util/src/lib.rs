@@ -16,8 +16,34 @@ pub mod c_internal {
     include!(concat!(env!("OUT_DIR"), "/c_internal.rs"));
 }
 
+#[cfg(target_arch = "x86_64")]
 pub mod cpuid;
+#[cfg(target_arch = "x86_64")]
 pub mod tsc;
+
+/// ARM64 stub for the x86-only cpuid module.
+#[cfg(target_arch = "aarch64")]
+pub mod cpuid {
+    /// ARM64 has no rdrand instruction.
+    pub fn supports_rdrand() -> bool { false }
+    /// ARM64 has no rdseed instruction.
+    pub fn supports_rdseed() -> bool { false }
+}
+
+/// ARM64 stub for the x86-only tsc module.
+#[cfg(target_arch = "aarch64")]
+pub mod tsc {
+    /// Stub Tsc that satisfies the type signatures used by Host.
+    /// On ARM64 this is never actually used for emulation (no rdtsc instruction).
+    #[repr(C)]
+    pub struct Tsc {
+        pub cyclesPerSecond: u64,
+    }
+    impl Tsc {
+        pub fn native_cycles_per_second() -> Option<u64> { None }
+        pub fn new(cycles_per_second: u64) -> Self { Self { cyclesPerSecond: cycles_per_second } }
+    }
+}
 
 /// Check whether the memory starting at `ip` starts with the instruction `insn`.
 ///

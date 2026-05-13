@@ -35,9 +35,9 @@
 // which we're supposed to use, but "asm/stat.h" *seems* to be the right version for x86-64, since
 // it seems to better match glibc's "struct stat" in "/usr/include/bits/struct_stat.h" ("st_nlink"
 // is ordered before "st_mode").
-#include <asm/stat.h>
+#include <asm-generic/stat.h>
 #include <asm/ucontext.h>
-#include <asm/unistd_64.h>
+#include <asm/unistd.h>
 
 #include <asm-generic/poll.h>
 

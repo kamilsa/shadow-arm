@@ -3,6 +3,8 @@
  * See LICENSE for licensing information
  */
 
+#ifdef __x86_64__
+
 #include <asm/prctl.h>
 #include <errno.h>
 #include <signal.h>
@@ -139,3 +141,11 @@ void shim_insn_emu_init() {
         panic("sigaction: %s", strerror(errno));
     }
 }
+
+#else // __x86_64__ not defined (e.g. ARM64)
+
+// On ARM64, there are no rdtsc/rdtscp/cpuid instructions to trap.
+// The function signature must still exist since shim.c calls shim_insn_emu_init().
+void shim_insn_emu_init() {}
+
+#endif

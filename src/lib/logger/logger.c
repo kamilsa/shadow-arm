@@ -14,7 +14,10 @@
 
 _Noreturn void logger_abort() {
     linux_kill(0, LINUX_SIGABRT);
-    asm("ud2");
+    // Trigger an undefined instruction to ensure we don't continue.
+    // __builtin_trap generates the appropriate instruction per architecture
+    // (ud2 on x86-64, brk #0 on ARM64).
+    __builtin_trap();
     // Convince compiler that we really don't return.
     while (1)
         ;

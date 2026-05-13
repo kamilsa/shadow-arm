@@ -113,10 +113,22 @@ impl ElfThreadPointer {
     /// Thread pointer for the current thread, if one is set.
     pub fn current() -> Option<Self> {
         // Based on 3.4.6 and 3.4.2 of [ELF-TLS], we retrieve the "thread
-        // pointer" by loading offset zero of the `fs` register; i.e. `%fs:0`.
-        let fs: usize;
-        unsafe { core::arch::asm!("mov {fs}, $fs:0x0", fs = out(reg) fs) };
-        NonZeroUsize::new(fs).map(Self)
+        // pointer" by reading the architecture-specific thread pointer register.
+        #[cfg(target_arch = "x86_64")]
+        let tp = {
+            let fs: usize;
+            // On x86-64: load offset zero of the `fs` segment register; i.e. `%fs:0`.
+            unsafe { core::arch::asm!("mov {fs}, $fs:0x0", fs = out(reg) fs) };
+            fs
+        };
+        #[cfg(target_arch = "aarch64")]
+        let tp = {
+            let tpidr: usize;
+            // On ARM64: read the thread pointer from tpidr_el0.
+            unsafe { core::arch::asm!("mrs {tpidr}, tpidr_el0", tpidr = out(reg) tpidr) };
+            tpidr
+        };
+        NonZeroUsize::new(tp).map(Self)
     }
 }
 

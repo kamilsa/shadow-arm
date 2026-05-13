@@ -933,9 +933,14 @@ int regularfile_getdents(RegularFile* file, struct linux_dirent* dirp, unsigned 
 
     trace("RegularFile %p getdents os-backed file %i", file, _regularfile_getOSBackedFD(file));
 
+    int result;
+#ifdef __aarch64__
+    // ARM64 doesn't have SYS_getdents; use getdents64 which always uses the 64-bit dirent.
+    result = (int)syscall(SYS_getdents64, _regularfile_getOSBackedFD(file), dirp, count);
+#else
     // getdents is not available for a direct call
-    int result =
-        (int)syscall(SYS_getdents, _regularfile_getOSBackedFD(file), dirp, count);
+    result = (int)syscall(SYS_getdents, _regularfile_getOSBackedFD(file), dirp, count);
+#endif
     return (result < 0) ? -errno : result;
 }
 

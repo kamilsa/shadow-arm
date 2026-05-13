@@ -30,7 +30,6 @@ static void* TEXT_START = NULL;
 // Immutable after global initialization, which should be done exactly once by
 // one thread.
 static void* TEXT_END = NULL;
-#define SIZEOF_SYSCALL_INSN 2
 
 // Handler function that receives syscalls that are stopped by the seccomp filter.
 static void _shim_seccomp_handle_sigsys(int sig, siginfo_t* info, void* voidUcontext) {
@@ -39,19 +38,39 @@ static void _shim_seccomp_handle_sigsys(int sig, siginfo_t* info, void* voidUcon
     if (sig != SIGSYS) {
         abort();
     }
-    greg_t* regs = ctx->uc_mcontext.gregs;
-    const int REG_N =  REG_RAX;
-    const int REG_ARG1 = REG_RDI;
-    const int REG_ARG2 = REG_RSI;
-    const int REG_ARG3 = REG_RDX;
-    const int REG_ARG4 = REG_R10;
-    const int REG_ARG5 = REG_R8;
-    const int REG_ARG6 = REG_R9;
 
-    // rip points to instruction *after* the syscall instruction, which is 2
-    // bytes long.
+#ifdef __x86_64__
+    #define SIZEOF_SYSCALL_INSN 2
+    greg_t* regs = ctx->uc_mcontext.gregs;
+    const long syscall_num = regs[REG_RAX];
+    const long arg1 = regs[REG_RDI];
+    const long arg2 = regs[REG_RSI];
+    const long arg3 = regs[REG_RDX];
+    const long arg4 = regs[REG_R10];
+    const long arg5 = regs[REG_R8];
+    const long arg6 = regs[REG_R9];
+    const void* pc = (void*)regs[REG_RIP];
+    // pc points to instruction *after* the syscall instruction, which is 2 bytes long.
     const void* syscall_insn_addr = (void*)regs[REG_RIP] - SIZEOF_SYSCALL_INSN;
-    trace("Trapped syscall %lld at %p", regs[REG_N], syscall_insn_addr);
+    unsigned long long* return_reg = &ctx->uc_mcontext.gregs[REG_RAX];
+#else
+    // ARM64: svc #0 instruction is 4 bytes.
+    #define SIZEOF_SYSCALL_INSN 4
+    // Syscall number from siginfo_t (x8 may be clobbered in the signal context).
+    const long syscall_num = info->si_syscall;
+    const long arg1 = ctx->uc_mcontext.regs[0];
+    const long arg2 = ctx->uc_mcontext.regs[1];
+    const long arg3 = ctx->uc_mcontext.regs[2];
+    const long arg4 = ctx->uc_mcontext.regs[3];
+    const long arg5 = ctx->uc_mcontext.regs[4];
+    const long arg6 = ctx->uc_mcontext.regs[5];
+    // pc (saved in sigcontext) points to the instruction after svc.
+    const void* pc = (void*)ctx->uc_mcontext.pc;
+    const void* syscall_insn_addr = (void*)(ctx->uc_mcontext.pc - SIZEOF_SYSCALL_INSN);
+    unsigned long long* return_reg = &ctx->uc_mcontext.regs[0];
+#endif
+
+    trace("Trapped syscall %ld at %p", syscall_num, syscall_insn_addr);
     if (syscall_insn_addr >= TEXT_START && syscall_insn_addr < TEXT_END) {
         panic("seccomp filter blocked syscall from %p, which is within %p-%p", syscall_insn_addr,
               TEXT_START, TEXT_END);
@@ -61,11 +80,12 @@ static void _shim_seccomp_handle_sigsys(int sig, siginfo_t* info, void* voidUcon
     // libc's).  It in turn will either emulate it or (if interposition is
     // disabled), make the call natively. In the latter case, the syscall
     // will be permitted to execute by the seccomp filter.
-    long rv = shim_syscall(ctx, prev_ctx, regs[REG_N], regs[REG_ARG1], regs[REG_ARG2],
-                           regs[REG_ARG3], regs[REG_ARG4], regs[REG_ARG5], regs[REG_ARG6]);
-    trace("Trapped syscall %lld returning %ld", ctx->uc_mcontext.gregs[REG_RAX], rv);
-    ctx->uc_mcontext.gregs[REG_RAX] = rv;
+    long rv = shim_syscall(ctx, prev_ctx, syscall_num, arg1, arg2,
+                           arg3, arg4, arg5, arg6);
+    trace("Trapped syscall %ld returning %ld", syscall_num, rv);
+    *return_reg = rv;
     shim_swapExecutionContext(prev_ctx);
+#undef SIZEOF_SYSCALL_INSN
 }
 
 // TODO: dedupe this with `maps` parsing in `patch_vdso.c` and `proc_maps.rs`,

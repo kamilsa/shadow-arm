@@ -1,3 +1,4 @@
+#[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::_rdtsc as rdtsc;
 use std::sync::Arc;
 use std::sync::atomic::AtomicBool;
@@ -23,6 +24,8 @@ fn test_wait_for_timeout() {
 // Same idea as `test_wait_for_timeout`, but for a loop that makes *no* syscalls, only checking the
 // time directly via rdtsc. Regression test for
 // https://github.com/shadow/shadow/discussions/2299#discussioncomment-3198368
+// x86-64 only: rdtsc instruction doesn't exist on ARM64.
+#[cfg(target_arch = "x86_64")]
 fn test_wait_for_rdtsc_timeout() {
     let t0 = unsafe { rdtsc() };
     let target = t0 + 1000;
@@ -54,8 +57,11 @@ fn test_wait_for_other_thread_with_inline_sched_yield() {
 fn main() {
     println!("test_wait_for_timeout");
     test_wait_for_timeout();
-    println!("test_wait_for_rdtsc_timeout");
-    test_wait_for_rdtsc_timeout();
+    #[cfg(target_arch = "x86_64")]
+    {
+        println!("test_wait_for_rdtsc_timeout");
+        test_wait_for_rdtsc_timeout();
+    }
     println!("test_wait_for_other_thread_with_inline_sched_yield");
     test_wait_for_other_thread_with_inline_sched_yield();
 }

@@ -1,3 +1,4 @@
+#[cfg(target_arch = "x86_64")]
 use linux_api::prctl::ArchPrctlOp;
 use nix::poll::{PollFd, PollFlags, poll};
 use nix::sys::signal::{SaFlags, SigAction, SigHandler, SigSet, Signal as NixSignal};
@@ -104,6 +105,7 @@ fn get_tests() -> Vec<test_utils::ShadowTest<(), String>> {
             set![TestEnv::Libc, TestEnv::Shadow],
         ),
         test_utils::ShadowTest::new("test_name", test_name, set![TestEnv::Libc, TestEnv::Shadow]),
+        #[cfg(target_arch = "x86_64")]
         test_utils::ShadowTest::new(
             "test_trap_cpuid",
             test_trap_cpuid,
@@ -266,6 +268,7 @@ fn test_parent_death_signal_delivery() -> Result<(), String> {
     Ok(())
 }
 
+#[cfg(target_arch = "x86_64")]
 fn test_trap_cpuid() -> Result<(), String> {
     // It should *look like* cpuid is permitted, whether or not we're running under shadow.
     let res = unsafe { linux_api::prctl::arch_prctl(ArchPrctlOp::ARCH_GET_CPUID, 0) };

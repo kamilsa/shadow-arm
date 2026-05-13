@@ -2535,11 +2535,11 @@ fn fd_test_helper(
             std::mem::size_of::<libc::sockaddr_in>() as u32,
         ),
         libc::AF_UNIX => {
-            let mut path = [0i8; 108];
+            let mut path = [0 as core::ffi::c_char; 108];
             path[1] = 3;
             path[2] = 63;
             path[3] = 103;
-            path[4] = -124;
+            path[4] = (-124i8) as core::ffi::c_char;
             path[5] = 107;
             (
                 SockAddr::Unix(libc::sockaddr_un {

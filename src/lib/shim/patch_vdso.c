@@ -148,15 +148,76 @@ static int _replacement_gettimeofday(void* arg1, void* arg2) {
     return (int)syscall(SYS_gettimeofday, arg1, arg2);
 }
 
+#ifdef SYS_time
 static int _replacement_time(void* arg1) { return (int)syscall(SYS_time, arg1); }
+#endif
 
 static int _replacement_clock_gettime(void* arg1, void* arg2) {
     return (int)syscall(SYS_clock_gettime, arg1, arg2);
 }
 
+#ifdef SYS_getcpu
 static int _replacement_getcpu(void* arg1, void* arg2, void* arg3) {
     return (int)syscall(SYS_getcpu, arg1, arg2, arg3);
 }
+#endif
+
+#ifdef __aarch64__
+// ARM64: Inject a trampoline that branches to replacementFn.
+//
+// Uses a relative branch (B <offset>) if the target is within +/-128MB (26-bit signed offset).
+// Returns 4 on success.
+//
+// Falls back to an absolute jump: LDR x16, 8; BR x16; <8-byte address> (16 bytes total).
+// Returns 16 on success.
+//
+// Returns 0 if the symbol is too small for even the relative branch.
+
+static size_t _inject_trampoline_relative(void* start, size_t symbolSize, void* replacementFn) {
+    // ARM64 B instruction: 0x14000000 | (imm26 & 0x03FFFFFF)
+    // imm26 = (target_pc - current_pc) / 4, as a 26-bit signed value.
+    intptr_t offset = (intptr_t)replacementFn - (intptr_t)start;
+    if (offset % 4 != 0) {
+        trace("Offset from %p to %p not 4-byte aligned", start, replacementFn);
+        return 0;
+    }
+    intptr_t imm26 = offset / 4;
+    if (imm26 > ((1 << 25) - 1) || imm26 < -(1 << 25)) {
+        trace("Offset from %p to %p doesn't fit in B instruction (+/-128MB)", start, replacementFn);
+        return 0;
+    }
+
+    const size_t trampolineSize = 4;
+    if (symbolSize < trampolineSize) {
+        trace("Can't inject %zd byte trampoline into %zd byte symbol", trampolineSize, symbolSize);
+        return 0;
+    }
+
+    uint32_t insn = 0x14000000 | ((uint32_t)imm26 & 0x03FFFFFF);
+    memcpy(start, &insn, 4);
+    return trampolineSize;
+}
+
+static size_t _inject_trampoline_absolute(void* start, size_t symbolSize, void* replacementFn) {
+    // ARM64 absolute jump: LDR x16, #8; BR x16; <8-byte address>
+    // LDR x16, #8  →  0x58000050
+    // BR x16       →  0xD61F0200
+    const size_t trampolineSize = 16;
+
+    if (symbolSize < trampolineSize) {
+        trace("Can't inject %zd byte trampoline into %zd byte symbol", trampolineSize, symbolSize);
+        return 0;
+    }
+
+    uint32_t* current = start;
+    *(current++) = 0x58000050;  // LDR x16, #8
+    *(current++) = 0xD61F0200;  // BR x16
+    memcpy(current, &replacementFn, sizeof(replacementFn));
+
+    return trampolineSize;
+}
+#else
+// x86-64 original trampolines.
 
 // Inject a trampoline that uses a relative jump. Only needs 5 bytes, but requires
 // that the offset fits in an i32.
@@ -217,6 +278,7 @@ static size_t _inject_trampoline_absolute(void* start, size_t symbolSize, void* 
     assert(actualTrampolineSize == trampolineSize);
     return actualTrampolineSize;
 }
+#endif
 
 static void _inject_trampoline(struct ParsedElf* parsedElf, const char* vdsoFnName,
                                void* replacementFn) {
@@ -264,10 +326,18 @@ void patch_vdso(void* vdsoBase) {
         panic("mprotect: %s", strerror(errno));
     }
 
+#ifdef __aarch64__
+    // ARM64 VDSO exports different symbols than x86-64.
+    // No __vdso_time or __vdso_getcpu on ARM64.
+    _inject_trampoline(&parsedElf, "__kernel_gettimeofday", _replacement_gettimeofday);
+    _inject_trampoline(&parsedElf, "__kernel_clock_gettime", _replacement_clock_gettime);
+    _inject_trampoline(&parsedElf, "__kernel_clock_getres", _replacement_clock_gettime);
+#else
     _inject_trampoline(&parsedElf, "__vdso_gettimeofday", _replacement_gettimeofday);
     _inject_trampoline(&parsedElf, "__vdso_time", _replacement_time);
     _inject_trampoline(&parsedElf, "__vdso_clock_gettime", _replacement_clock_gettime);
     _inject_trampoline(&parsedElf, "__vdso_getcpu", _replacement_getcpu);
+#endif
 
     if (mprotect((void*)parsedElf.mapStart, regionSize, PROT_READ | PROT_EXEC)) {
         panic("mprotect: %s", strerror(errno));

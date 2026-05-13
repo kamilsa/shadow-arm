@@ -487,6 +487,7 @@ pub unsafe fn release_and_exit_current_thread(exit_status: i32) -> ! {
 
 /// Emulate the cpuid instruction. Takes the current values of rax-rdx,
 /// which are mutated to the updated values.
+#[cfg(target_arch = "x86_64")]
 fn emulate_cpuid(
     rax: &mut core::ffi::c_longlong,
     rbx: &mut core::ffi::c_longlong,
@@ -889,6 +890,7 @@ pub mod export {
     /// # Safety
     ///
     /// Parameters must be safely dereferenceable and writable.
+    #[cfg(target_arch = "x86_64")]
     #[unsafe(no_mangle)]
     pub unsafe extern "C-unwind" fn _shim_emulate_cpuid(
         rax: *mut core::ffi::c_longlong,
@@ -903,4 +905,15 @@ pub mod export {
             unsafe { rdx.as_mut() }.unwrap(),
         );
     }
+
+    /// On ARM64 there is no cpuid instruction to emulate. This stub prevents
+    /// a linker error if C code references the symbol (it never should).
+    #[cfg(target_arch = "aarch64")]
+    #[unsafe(no_mangle)]
+    pub unsafe extern "C-unwind" fn _shim_emulate_cpuid(
+        _rax: *mut core::ffi::c_longlong,
+        _rbx: *mut core::ffi::c_longlong,
+        _rcx: *mut core::ffi::c_longlong,
+        _rdx: *mut core::ffi::c_longlong,
+    ) {}
 }

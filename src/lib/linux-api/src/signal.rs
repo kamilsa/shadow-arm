@@ -1027,6 +1027,13 @@ pub unsafe extern "C" fn sigaction_restorer() {
     // once `const` asm template operands are stabilized.
     asm!("mov rax, 15", "syscall", "ud2")
 }
+#[cfg(target_arch = "aarch64")]
+#[naked_function::naked]
+pub unsafe extern "C" fn sigaction_restorer() {
+    // 139 is __NR_rt_sigreturn on ARM64; see static assertion below.
+    // The `rt_sigreturn` shouldn't return, so execution stops here.
+    asm!("mov x8, 139", "svc #0")
+}
 static_assertions::const_assert_eq!(bindings::LINUX___NR_rt_sigreturn, 15);
 
 /// # Invariants

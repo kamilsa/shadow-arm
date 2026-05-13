@@ -881,7 +881,7 @@ fn test_non_existent_path(sock_type: libc::c_int, flag: libc::c_int) -> Result<(
     assert!(fd >= 0);
 
     const NON_EXISTENT_PATH: &[u8] = b"/asdf/qwerty/y89pq234589oles.sock";
-    let mut path = [0i8; 108];
+    let mut path = [0 as core::ffi::c_char; 108];
     path[..NON_EXISTENT_PATH.len()].copy_from_slice(test_utils::u8_to_i8_slice(NON_EXISTENT_PATH));
 
     let addr = libc::sockaddr_un {
