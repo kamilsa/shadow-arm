@@ -72,8 +72,8 @@ bool shim_sys_handle_syscall_locally(long syscall_num, long* rv, va_list args) {
 
             trace("servicing syscall %ld:clock_gettime from the shim", syscall_num);
 
-            clockid_t clk_id = va_arg(args, clockid_t);
-            struct timespec* tp = va_arg(args, struct timespec*);
+            clockid_t clk_id = (clockid_t)va_arg(args, long);
+            struct timespec* tp = (struct timespec*)va_arg(args, long);
 
             if (clk_id < LINUX_CLOCK_REALTIME || clk_id > LINUX_CLOCK_TAI) {
                 trace("found invalid clock id %ld", (long)clk_id);
@@ -102,7 +102,7 @@ bool shim_sys_handle_syscall_locally(long syscall_num, long* rv, va_list args) {
 
             trace("servicing syscall %ld:time from the shim", syscall_num);
 
-            time_t* tp = va_arg(args, time_t*);
+            time_t* tp = (time_t*)va_arg(args, long);
 
             if (tp) {
                 *tp = now;
@@ -122,7 +122,7 @@ bool shim_sys_handle_syscall_locally(long syscall_num, long* rv, va_list args) {
 
             trace("servicing syscall %ld:gettimeofday from the shim", syscall_num);
 
-            struct timeval* tp = va_arg(args, struct timeval*);
+            struct timeval* tp = (struct timeval*)va_arg(args, long);
 
             if (tp) {
                 tp->tv_sec = micros / 1000000;

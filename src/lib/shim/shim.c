@@ -118,21 +118,47 @@ void _shim_parent_init_preload() {
         panic("Unexpectedly called from non-shadow context");
     }
 
+    dprintf(STDERR_FILENO, "SHIM: IPC init...\n");
     _shim_parent_init_ipc();
+    dprintf(STDERR_FILENO, "SHIM: IPC done\n");
+    dprintf(STDERR_FILENO, "SHIM: _shim_ipc_wait_for_start_event...\n");
     _shim_ipc_wait_for_start_event();
+    dprintf(STDERR_FILENO, "SHIM: _shim_ipc_wait_for_start_event done\n");
 
+    dprintf(STDERR_FILENO, "SHIM: shim_install_hardware_error_handlers...\n");
     shim_install_hardware_error_handlers();
-    patch_vdso((void*)getauxval(AT_SYSINFO_EHDR))
+    dprintf(STDERR_FILENO, "SHIM: shim_install_hardware_error_handlers done\n");
+    //patch_vdso (disabled for testing)
+    dprintf(STDERR_FILENO, "SHIM: _shim_parent_init_host_shm...\n");
     _shim_parent_init_host_shm();
+    dprintf(STDERR_FILENO, "SHIM: _shim_parent_init_host_shm done\n");
+    dprintf(STDERR_FILENO, "SHIM: _shim_parent_init_manager_shm...\n");
     _shim_parent_init_manager_shm();
+    dprintf(STDERR_FILENO, "SHIM: _shim_parent_init_manager_shm done\n");
+    dprintf(STDERR_FILENO, "SHIM: _shim_parent_init_logging...\n");
     _shim_parent_init_logging();
+    dprintf(STDERR_FILENO, "SHIM: _shim_parent_init_logging done\n");
+    dprintf(STDERR_FILENO, "SHIM: _shim_init_signal_stack...\n");
     _shim_init_signal_stack();
+    dprintf(STDERR_FILENO, "SHIM: _shim_init_signal_stack done\n");
+    dprintf(STDERR_FILENO, "SHIM: _shim_init_death_signal...\n");
     _shim_init_death_signal();
+    dprintf(STDERR_FILENO, "SHIM: _shim_init_death_signal done\n");
+    dprintf(STDERR_FILENO, "SHIM: _shim_parent_init_memory_manager...\n");
     _shim_parent_init_memory_manager();
+    dprintf(STDERR_FILENO, "SHIM: _shim_parent_init_memory_manager done\n");
+    dprintf(STDERR_FILENO, "SHIM: _shim_parent_init_insn_emu...\n");
     _shim_parent_init_insn_emu();
+    dprintf(STDERR_FILENO, "SHIM: _shim_parent_init_insn_emu done\n");
+    dprintf(STDERR_FILENO, "SHIM: _shim_parent_init_seccomp...\n");
     _shim_parent_init_seccomp();
+    dprintf(STDERR_FILENO, "SHIM: _shim_parent_init_seccomp done\n");
+    dprintf(STDERR_FILENO, "SHIM: _shim_parent_close_stdin...\n");
     _shim_parent_close_stdin();
+    dprintf(STDERR_FILENO, "SHIM: _shim_parent_close_stdin done\n");
+    dprintf(STDERR_FILENO, "SHIM: preempt_process_init...\n");
     preempt_process_init();
+    dprintf(STDERR_FILENO, "SHIM: preempt_process_init done\n");
 }
 
 void _shim_child_thread_init_preload() {
@@ -142,7 +168,9 @@ void _shim_child_thread_init_preload() {
 
     _shim_preload_only_child_ipc_wait_for_start_event();
 
+    dprintf(STDERR_FILENO, "SHIM: _shim_init_signal_stack...\n");
     _shim_init_signal_stack();
+    dprintf(STDERR_FILENO, "SHIM: _shim_init_signal_stack done\n");
 }
 
 void _shim_child_process_init_preload() {
@@ -151,8 +179,12 @@ void _shim_child_process_init_preload() {
     }
 
     _shim_preload_only_child_ipc_wait_for_start_event();
+    dprintf(STDERR_FILENO, "SHIM: _shim_init_signal_stack...\n");
     _shim_init_signal_stack();
+    dprintf(STDERR_FILENO, "SHIM: _shim_init_signal_stack done\n");
+    dprintf(STDERR_FILENO, "SHIM: _shim_init_death_signal...\n");
     _shim_init_death_signal();
+    dprintf(STDERR_FILENO, "SHIM: _shim_init_death_signal done\n");
 }
 
 void shim_ensure_init() { _shim_load(); }

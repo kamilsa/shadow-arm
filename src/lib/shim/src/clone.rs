@@ -115,6 +115,12 @@ unsafe extern "C-unwind" fn set_context(ctx: &sigcontext) -> ! {
 ///   pstate:        0x110
 #[cfg(target_arch = "aarch64")]
 unsafe extern "C-unwind" fn set_context(ctx: &sigcontext) -> ! {
+    debug_assert_eq!(sigcontext_offset_of(ctx, &ctx.regs[0]), 0x8);
+    debug_assert_eq!(sigcontext_offset_of(ctx, &ctx.regs[1]), 0x10);
+    debug_assert_eq!(sigcontext_offset_of(ctx, &ctx.regs[30]), 0xF8);
+    debug_assert_eq!(sigcontext_offset_of(ctx, &ctx.sp), 0x100);
+    debug_assert_eq!(sigcontext_offset_of(ctx, &ctx.pc), 0x108);
+
     unsafe {
         core::arch::asm!(
             // x0 = ctx base pointer
@@ -241,16 +247,13 @@ unsafe fn do_clone_process(ctx: &ucontext, event: &ShimEventAddThreadReq) -> i64
                 ExecutionContext::Application.enter_without_restorer();
                 let mut mctx = ctx.uc_mcontext;
                 // Set the stack pointer in the saved context.
-                // On x86-64, the sigcontext field is `rsp`.
-                // On ARM64, bindgen may name it differently; write directly to offset 0x100.
                 #[cfg(target_arch = "x86_64")]
-                { mctx.rsp = child_stack as u64; }
+                {
+                    mctx.rsp = child_stack as u64;
+                }
                 #[cfg(target_arch = "aarch64")]
                 {
-                    // ARM64 sigcontext layout: regs[31] at offset 0x8, sp at offset 0x100
-                    let sp_offset = 0x100usize;
-                    let mctx_ptr: *mut u8 = (&raw mut mctx).cast::<u8>();
-                    unsafe { mctx_ptr.add(sp_offset).cast::<u64>().write(child_stack as u64); }
+                    mctx.sp = child_stack as u64;
                 }
                 unsafe { set_context(&mctx) };
             }
@@ -303,13 +306,12 @@ unsafe fn do_clone_thread(ctx: &ucontext, event: &ShimEventAddThreadReq) -> i64 
     // Update child's copy of context to use the child's stack.
     let child_sigctx = unsafe { child_sigcontext.as_mut().unwrap() };
     #[cfg(target_arch = "x86_64")]
-    { child_sigctx.rsp = child_stack as u64; }
+    {
+        child_sigctx.rsp = child_stack as u64;
+    }
     #[cfg(target_arch = "aarch64")]
     {
-        // ARM64 sigcontext layout: regs[31] at offset 0x8, sp at offset 0x100
-        let sp_offset = 0x100usize;
-        let mctx_ptr: *mut u8 = (&raw mut *child_sigctx).cast::<u8>();
-        unsafe { mctx_ptr.add(sp_offset).cast::<u64>().write(child_stack as u64); }
+        child_sigctx.sp = child_stack as u64;
     }
 
     // Copy child's IPC block to child's stack
@@ -442,8 +444,8 @@ unsafe fn do_clone_thread(ctx: &ucontext, event: &ShimEventAddThreadReq) -> i64 
             in("x8") libc::SYS_clone,
             in("x1") child_current_rsp,
             in("x2") ptid,
-            in("x3") ctid,
-            in("x4") newtls,
+            in("x3") newtls,
+            in("x4") ctid,
             in("x24") crate::EXECUTION_CONTEXT_SHADOW_CONST as usize,
             in("x25") crate::EXECUTION_CONTEXT_APPLICATION_CONST as usize,
             in("x26") child_ipc_blk as *const ShMemBlockSerialized as usize,

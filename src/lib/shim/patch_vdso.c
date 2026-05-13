@@ -156,6 +156,10 @@ static int _replacement_clock_gettime(void* arg1, void* arg2) {
     return (int)syscall(SYS_clock_gettime, arg1, arg2);
 }
 
+static int _replacement_clock_getres(void* arg1, void* arg2) {
+    return (int)syscall(SYS_clock_getres, arg1, arg2);
+}
+
 #ifdef SYS_getcpu
 static int _replacement_getcpu(void* arg1, void* arg2, void* arg3) {
     return (int)syscall(SYS_getcpu, arg1, arg2, arg3);
@@ -195,6 +199,7 @@ static size_t _inject_trampoline_relative(void* start, size_t symbolSize, void* 
 
     uint32_t insn = 0x14000000 | ((uint32_t)imm26 & 0x03FFFFFF);
     memcpy(start, &insn, 4);
+    __builtin___clear_cache(start, (char*)start + trampolineSize);
     return trampolineSize;
 }
 
@@ -213,6 +218,7 @@ static size_t _inject_trampoline_absolute(void* start, size_t symbolSize, void* 
     *(current++) = 0x58000050;  // LDR x16, #8
     *(current++) = 0xD61F0200;  // BR x16
     memcpy(current, &replacementFn, sizeof(replacementFn));
+    __builtin___clear_cache(start, (char*)start + trampolineSize);
 
     return trampolineSize;
 }
@@ -331,7 +337,7 @@ void patch_vdso(void* vdsoBase) {
     // No __vdso_time or __vdso_getcpu on ARM64.
     _inject_trampoline(&parsedElf, "__kernel_gettimeofday", _replacement_gettimeofday);
     _inject_trampoline(&parsedElf, "__kernel_clock_gettime", _replacement_clock_gettime);
-    _inject_trampoline(&parsedElf, "__kernel_clock_getres", _replacement_clock_gettime);
+    _inject_trampoline(&parsedElf, "__kernel_clock_getres", _replacement_clock_getres);
 #else
     _inject_trampoline(&parsedElf, "__vdso_gettimeofday", _replacement_gettimeofday);
     _inject_trampoline(&parsedElf, "__vdso_time", _replacement_time);

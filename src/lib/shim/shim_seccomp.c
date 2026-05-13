@@ -31,6 +31,20 @@ static void* TEXT_START = NULL;
 // one thread.
 static void* TEXT_END = NULL;
 
+static void _debug_sigsys(const char* label, long syscall_num, const void* pc,
+                          const void* syscall_insn_addr, long rv) {
+    char buf[256];
+    int len = snprintf(buf, sizeof(buf), "SIGSYS_DEBUG %s n=%ld pc=%p insn=%p rv=%ld\n", label,
+                       syscall_num, pc, syscall_insn_addr, rv);
+    if (len < 0) {
+        return;
+    }
+    if (len > (int)sizeof(buf)) {
+        len = sizeof(buf);
+    }
+    shim_native_syscall(NULL, SYS_write, STDERR_FILENO, buf, (long)len);
+}
+
 // Handler function that receives syscalls that are stopped by the seccomp filter.
 static void _shim_seccomp_handle_sigsys(int sig, siginfo_t* info, void* voidUcontext) {
     ExecutionContext prev_ctx = shim_swapExecutionContext(EXECUTION_CONTEXT_SHADOW);
@@ -71,6 +85,7 @@ static void _shim_seccomp_handle_sigsys(int sig, siginfo_t* info, void* voidUcon
 #endif
 
     trace("Trapped syscall %ld at %p", syscall_num, syscall_insn_addr);
+    _debug_sigsys("entry", syscall_num, pc, syscall_insn_addr, 0);
     if (syscall_insn_addr >= TEXT_START && syscall_insn_addr < TEXT_END) {
         panic("seccomp filter blocked syscall from %p, which is within %p-%p", syscall_insn_addr,
               TEXT_START, TEXT_END);
@@ -83,6 +98,7 @@ static void _shim_seccomp_handle_sigsys(int sig, siginfo_t* info, void* voidUcon
     long rv = shim_syscall(ctx, prev_ctx, syscall_num, arg1, arg2,
                            arg3, arg4, arg5, arg6);
     trace("Trapped syscall %ld returning %ld", syscall_num, rv);
+    _debug_sigsys("return", syscall_num, pc, syscall_insn_addr, rv);
     *return_reg = rv;
     shim_swapExecutionContext(prev_ctx);
 #undef SIZEOF_SYSCALL_INSN

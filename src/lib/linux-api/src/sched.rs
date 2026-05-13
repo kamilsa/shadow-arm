@@ -186,7 +186,8 @@ pub unsafe fn clone_raw(
     child_tid: *mut core::ffi::c_int,
     tls: core::ffi::c_ulong,
 ) -> Result<core::ffi::c_long, Errno> {
-    unsafe {
+    #[cfg(target_arch = "x86_64")]
+    return unsafe {
         linux_syscall::syscall!(
             linux_syscall::SYS_clone,
             flags,
@@ -197,7 +198,21 @@ pub unsafe fn clone_raw(
         )
     }
     .try_i64()
-    .map_err(Errno::from)
+    .map_err(Errno::from);
+
+    #[cfg(target_arch = "aarch64")]
+    return unsafe {
+        linux_syscall::syscall!(
+            linux_syscall::SYS_clone,
+            flags,
+            stack,
+            parent_tid,
+            tls,
+            child_tid
+        )
+    }
+    .try_i64()
+    .map_err(Errno::from);
 }
 
 /// # Safety
@@ -292,8 +307,8 @@ pub unsafe fn fork_raw() -> Result<core::ffi::c_long, Errno> {
             flags,
             child_stack,
             ptid,
-            ctid,
-            newtls
+            newtls,
+            ctid
         )
     }
     .try_i64()

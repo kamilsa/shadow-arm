@@ -35,11 +35,13 @@
 __attribute__((constructor, used)) void _injector_load() {
     // Make a call to the shim to ensure that it's loaded. The SYS_time syscall
     // will be handled locally in the shim, avoiding IPC with Shadow.
+    dprintf(STDERR_FILENO, "INJECTOR: enter\n");
 #ifdef SYS_time
     shim_api_syscall(SYS_time, NULL);
 #else
     shim_api_syscall(SYS_clock_gettime, NULL);
 #endif
+    dprintf(STDERR_FILENO, "INJECTOR: done\n");
     return;
 }
 

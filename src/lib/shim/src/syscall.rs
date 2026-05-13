@@ -17,6 +17,18 @@ use shadow_shim_helper_rs::util::time::TimeParts;
 
 use crate::{bindings, global_host_shmem, tls_ipc, tls_thread_shmem};
 
+fn set_syscall_return_value(ctx: &mut ucontext, retval: SyscallReg) {
+    #[cfg(target_arch = "x86_64")]
+    {
+        ctx.uc_mcontext.rax = retval.into();
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        ctx.uc_mcontext.regs[0] = retval.into();
+    }
+}
+
 /// # Safety
 ///
 /// The specified syscall must be safe to make.
@@ -93,7 +105,7 @@ pub(crate) unsafe fn emulated_syscall_event(
                     // in the kernel; i.e. a handler for a signal that
                     // is interrupted a blocking syscall should see the syscall
                     // result (-EINTR) in the context passed to that handler.
-                    ctx.uc_mcontext.rax = syscall_complete.retval.into();
+                    set_syscall_return_value(ctx, syscall_complete.retval);
                 }
 
                 // SAFETY: `ctx` should be valid if present.

@@ -611,6 +611,7 @@ fn wait_for_start_event(is_first_thread: bool) {
     let ShimEventToShim::StartRes(res) = res else {
         panic!("Unexpected response: {res:?}");
     };
+    #[cfg(target_arch = "x86_64")]
     if is_first_thread {
         // SAFETY: We're ensuring serial execution in this process, and no other
         // Rust code in this library should have tried accessing the auxiliary

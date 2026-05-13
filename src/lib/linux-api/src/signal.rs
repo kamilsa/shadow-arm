@@ -1034,7 +1034,10 @@ pub unsafe extern "C" fn sigaction_restorer() {
     // The `rt_sigreturn` shouldn't return, so execution stops here.
     asm!("mov x8, 139", "svc #0")
 }
+#[cfg(target_arch = "x86_64")]
 static_assertions::const_assert_eq!(bindings::LINUX___NR_rt_sigreturn, 15);
+#[cfg(target_arch = "aarch64")]
+static_assertions::const_assert_eq!(linux_raw_sys::general::__NR_rt_sigreturn, 139);
 
 /// # Invariants
 ///

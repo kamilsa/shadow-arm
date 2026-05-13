@@ -58,6 +58,83 @@ mod wait;
 type LegacySyscallFn =
     unsafe extern "C-unwind" fn(*mut SyscallHandler, *const SyscallArgs) -> SyscallReturn;
 
+fn should_have_been_handled_by_shim(syscall: SyscallNum) -> bool {
+    if matches!(
+        syscall,
+        SyscallNum::NR_clock_gettime | SyscallNum::NR_gettimeofday | SyscallNum::NR_sched_yield
+    ) {
+        return true;
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    if syscall == SyscallNum::NR_time {
+        return true;
+    }
+
+    false
+}
+
+fn native_linux_handles_syscall(syscall: SyscallNum) -> bool {
+    if matches!(
+        syscall,
+        SyscallNum::NR_exit
+            | SyscallNum::NR_getcwd
+            | SyscallNum::NR_geteuid
+            | SyscallNum::NR_getegid
+            | SyscallNum::NR_getgid
+            | SyscallNum::NR_getgroups
+            | SyscallNum::NR_getresgid
+            | SyscallNum::NR_getresuid
+            | SyscallNum::NR_getuid
+            | SyscallNum::NR_getxattr
+            | SyscallNum::NR_lgetxattr
+            | SyscallNum::NR_listxattr
+            | SyscallNum::NR_llistxattr
+            | SyscallNum::NR_lremovexattr
+            | SyscallNum::NR_lsetxattr
+            | SyscallNum::NR_madvise
+            | SyscallNum::NR_removexattr
+            | SyscallNum::NR_rt_sigreturn
+            | SyscallNum::NR_setfsgid
+            | SyscallNum::NR_setfsuid
+            | SyscallNum::NR_setgid
+            | SyscallNum::NR_setregid
+            | SyscallNum::NR_setresgid
+            | SyscallNum::NR_setresuid
+            | SyscallNum::NR_setreuid
+            | SyscallNum::NR_setuid
+            | SyscallNum::NR_setxattr
+            | SyscallNum::NR_statfs
+            | SyscallNum::NR_truncate
+    ) {
+        return true;
+    }
+
+    #[cfg(target_arch = "x86_64")]
+    if matches!(
+        syscall,
+        SyscallNum::NR_access
+            | SyscallNum::NR_chmod
+            | SyscallNum::NR_chown
+            | SyscallNum::NR_lchown
+            | SyscallNum::NR_link
+            | SyscallNum::NR_lstat
+            | SyscallNum::NR_mkdir
+            | SyscallNum::NR_mknod
+            | SyscallNum::NR_rename
+            | SyscallNum::NR_rmdir
+            | SyscallNum::NR_stat
+            | SyscallNum::NR_symlink
+            | SyscallNum::NR_unlink
+            | SyscallNum::NR_utime
+            | SyscallNum::NR_utimes
+    ) {
+        return true;
+    }
+
+    false
+}
+
 // Will eventually contain syscall handler state once migrated from the c handler
 pub struct SyscallHandler {
     /// The host that this `SyscallHandler` belongs to. Intended to be used for logging.
@@ -372,6 +449,7 @@ impl SyscallHandler {
             SyscallNum::NR_accept4 => handle!(accept4),
             #[cfg(target_arch = "x86_64")]
             SyscallNum::NR_arch_prctl => handle!(arch_prctl),
+            #[cfg(target_arch = "x86_64")]
             SyscallNum::NR_alarm => handle!(alarm),
             SyscallNum::NR_bind => handle!(bind),
             SyscallNum::NR_brk => handle!(brk),
@@ -385,16 +463,21 @@ impl SyscallHandler {
             SyscallNum::NR_close => handle!(close),
             SyscallNum::NR_close_range => handle!(close_range),
             SyscallNum::NR_connect => handle!(connect),
+            #[cfg(target_arch = "x86_64")]
             SyscallNum::NR_creat => handle!(creat),
             SyscallNum::NR_dup => handle!(dup),
+            #[cfg(target_arch = "x86_64")]
             SyscallNum::NR_dup2 => handle!(dup2),
             SyscallNum::NR_dup3 => handle!(dup3),
+            #[cfg(target_arch = "x86_64")]
             SyscallNum::NR_epoll_create => handle!(epoll_create),
             SyscallNum::NR_epoll_create1 => handle!(epoll_create1),
             SyscallNum::NR_epoll_ctl => handle!(epoll_ctl),
             SyscallNum::NR_epoll_pwait => handle!(epoll_pwait),
             SyscallNum::NR_epoll_pwait2 => handle!(epoll_pwait2),
+            #[cfg(target_arch = "x86_64")]
             SyscallNum::NR_epoll_wait => handle!(epoll_wait),
+            #[cfg(target_arch = "x86_64")]
             SyscallNum::NR_eventfd => handle!(eventfd),
             SyscallNum::NR_eventfd2 => handle!(eventfd2),
             SyscallNum::NR_execve => handle!(execve),
@@ -414,6 +497,7 @@ impl SyscallHandler {
             SyscallNum::NR_fgetxattr => handle!(fgetxattr),
             SyscallNum::NR_flistxattr => handle!(flistxattr),
             SyscallNum::NR_flock => handle!(flock),
+            #[cfg(target_arch = "x86_64")]
             SyscallNum::NR_fork => handle!(fork),
             SyscallNum::NR_fremovexattr => handle!(fremovexattr),
             SyscallNum::NR_fsetxattr => handle!(fsetxattr),
@@ -422,13 +506,16 @@ impl SyscallHandler {
             SyscallNum::NR_fsync => handle!(fsync),
             SyscallNum::NR_ftruncate => handle!(ftruncate),
             SyscallNum::NR_futex => handle!(futex),
+            #[cfg(target_arch = "x86_64")]
             SyscallNum::NR_futimesat => handle!(futimesat),
             SyscallNum::NR_get_robust_list => handle!(get_robust_list),
+            #[cfg(target_arch = "x86_64")]
             SyscallNum::NR_getdents => handle!(getdents),
             SyscallNum::NR_getdents64 => handle!(getdents64),
             SyscallNum::NR_getitimer => handle!(getitimer),
             SyscallNum::NR_getpeername => handle!(getpeername),
             SyscallNum::NR_getpgid => handle!(getpgid),
+            #[cfg(target_arch = "x86_64")]
             SyscallNum::NR_getpgrp => handle!(getpgrp),
             SyscallNum::NR_getpid => handle!(getpid),
             SyscallNum::NR_getppid => handle!(getppid),
@@ -451,10 +538,13 @@ impl SyscallHandler {
             SyscallNum::NR_munmap => handle!(munmap),
             SyscallNum::NR_nanosleep => handle!(nanosleep),
             SyscallNum::NR_newfstatat => handle!(newfstatat),
+            #[cfg(target_arch = "x86_64")]
             SyscallNum::NR_open => handle!(open),
             SyscallNum::NR_openat => handle!(openat),
+            #[cfg(target_arch = "x86_64")]
             SyscallNum::NR_pipe => handle!(pipe),
             SyscallNum::NR_pipe2 => handle!(pipe2),
+            #[cfg(target_arch = "x86_64")]
             SyscallNum::NR_poll => handle!(poll),
             SyscallNum::NR_ppoll => handle!(ppoll),
             SyscallNum::NR_prctl => handle!(prctl),
@@ -468,6 +558,7 @@ impl SyscallHandler {
             SyscallNum::NR_pwritev2 => handle!(pwritev2),
             SyscallNum::NR_read => handle!(read),
             SyscallNum::NR_readahead => handle!(readahead),
+            #[cfg(target_arch = "x86_64")]
             SyscallNum::NR_readlink => handle!(readlink),
             SyscallNum::NR_readlinkat => handle!(readlinkat),
             SyscallNum::NR_readv => handle!(readv),
@@ -484,6 +575,7 @@ impl SyscallHandler {
             SyscallNum::NR_sched_setparam => handle!(sched_setparam),
             SyscallNum::NR_sched_setaffinity => handle!(sched_setaffinity),
             SyscallNum::NR_sched_setscheduler => handle!(sched_setscheduler),
+            #[cfg(target_arch = "x86_64")]
             SyscallNum::NR_select => handle!(select),
             SyscallNum::NR_sendmsg => handle!(sendmsg),
             SyscallNum::NR_sendto => handle!(sendto),
@@ -511,6 +603,7 @@ impl SyscallHandler {
             SyscallNum::NR_uname => handle!(uname),
             SyscallNum::NR_unlinkat => handle!(unlinkat),
             SyscallNum::NR_utimensat => handle!(utimensat),
+            #[cfg(target_arch = "x86_64")]
             SyscallNum::NR_vfork => handle!(vfork),
             SyscallNum::NR_waitid => handle!(waitid),
             SyscallNum::NR_wait4 => handle!(wait4),
@@ -533,10 +626,7 @@ impl SyscallHandler {
             //
             // SHIM-ONLY SYSCALLS
             //
-            SyscallNum::NR_clock_gettime
-            | SyscallNum::NR_gettimeofday
-            | SyscallNum::NR_sched_yield
-            | SyscallNum::NR_time => {
+            x if should_have_been_handled_by_shim(x) => {
                 panic!(
                     "Syscall {} ({}) should have been handled in the shim",
                     syscall_name, ctx.args.number,
@@ -545,50 +635,7 @@ impl SyscallHandler {
             //
             // NATIVE LINUX-HANDLED SYSCALLS
             //
-            SyscallNum::NR_access
-            | SyscallNum::NR_chmod
-            | SyscallNum::NR_chown
-            | SyscallNum::NR_exit
-            | SyscallNum::NR_getcwd
-            | SyscallNum::NR_geteuid
-            | SyscallNum::NR_getegid
-            | SyscallNum::NR_getgid
-            | SyscallNum::NR_getgroups
-            | SyscallNum::NR_getresgid
-            | SyscallNum::NR_getresuid
-            | SyscallNum::NR_getuid
-            | SyscallNum::NR_getxattr
-            | SyscallNum::NR_lchown
-            | SyscallNum::NR_lgetxattr
-            | SyscallNum::NR_link
-            | SyscallNum::NR_listxattr
-            | SyscallNum::NR_llistxattr
-            | SyscallNum::NR_lremovexattr
-            | SyscallNum::NR_lsetxattr
-            | SyscallNum::NR_lstat
-            | SyscallNum::NR_madvise
-            | SyscallNum::NR_mkdir
-            | SyscallNum::NR_mknod
-            | SyscallNum::NR_removexattr
-            | SyscallNum::NR_rename
-            | SyscallNum::NR_rmdir
-            | SyscallNum::NR_rt_sigreturn
-            | SyscallNum::NR_setfsgid
-            | SyscallNum::NR_setfsuid
-            | SyscallNum::NR_setgid
-            | SyscallNum::NR_setregid
-            | SyscallNum::NR_setresgid
-            | SyscallNum::NR_setresuid
-            | SyscallNum::NR_setreuid
-            | SyscallNum::NR_setuid
-            | SyscallNum::NR_setxattr
-            | SyscallNum::NR_stat
-            | SyscallNum::NR_statfs
-            | SyscallNum::NR_symlink
-            | SyscallNum::NR_truncate
-            | SyscallNum::NR_unlink
-            | SyscallNum::NR_utime
-            | SyscallNum::NR_utimes => {
+            x if native_linux_handles_syscall(x) => {
                 log::trace!("Native syscall {} ({})", syscall_name, ctx.args.number);
 
                 let rv = Err(SyscallError::Native);
