@@ -25,7 +25,7 @@ pub fn write_sockaddr_and_len(
     let addr = match addr {
         Some(x) => x,
         None => {
-            mem.write(plugin_addr_len, &0)?;
+            mem.write(plugin_addr_len, &0u32)?;
             return Ok(());
         }
     };
@@ -33,38 +33,23 @@ pub fn write_sockaddr_and_len(
     let from_addr_slice = addr.as_slice();
     let from_len: u32 = from_addr_slice.len().try_into().unwrap();
 
-    // get the provided address buffer length, and overwrite it with the real address length
-    let plugin_addr_len = {
-        let mut plugin_addr_len = mem.memory_ref_mut(ForeignArrayPtr::new(plugin_addr_len, 1))?;
-        let plugin_addr_len_value = plugin_addr_len.get_mut(0).unwrap();
+    // SIMPLE: read current value, write new value, write address bytes
+    let plugin_addr_len_copy: u32 = mem.read(plugin_addr_len)?;
+    mem.write(plugin_addr_len, &from_len)?;
 
-        // keep a copy before we change it
-        let plugin_addr_len_copy = *plugin_addr_len_value;
-
-        *plugin_addr_len_value = from_len;
-
-        plugin_addr_len.flush()?;
-        plugin_addr_len_copy
-    };
-
-    // return early if the address length is 0
-    if plugin_addr_len == 0 {
+    if plugin_addr_len_copy == 0 {
         return Ok(());
     }
 
-    // the minimum of the given address buffer length and the real address length
-    let len_to_copy = std::cmp::min(from_len, plugin_addr_len).try_into().unwrap();
-
-    let plugin_addr = ForeignArrayPtr::new(plugin_addr.cast::<MaybeUninit<u8>>(), len_to_copy);
-    mem.copy_to_ptr(plugin_addr, &from_addr_slice[..len_to_copy])?;
+    let len_to_copy: usize = std::cmp::min(from_len as usize, plugin_addr_len_copy as usize);
+    // Write address bytes directly without MaybeUninit cast
+    let raw_bytes: &[u8] = unsafe { std::slice::from_raw_parts(from_addr_slice.as_ptr() as *const u8, len_to_copy) };
+    let dst = ForeignArrayPtr::new(plugin_addr, len_to_copy);
+    mem.copy_to_ptr(dst, raw_bytes)?;
 
     Ok(())
 }
 
-/// Writes the socket address into a buffer at `plugin_addr` with length `plugin_addr_len`.
-///
-/// If the buffer length is smaller than the socket address length, the written address will be
-/// truncated. The length of the socket address is returned.
 pub fn write_sockaddr(
     mem: &mut MemoryManager,
     addr: &SockaddrStorage,
