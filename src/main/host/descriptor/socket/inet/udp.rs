@@ -6,6 +6,9 @@ use std::sync::Arc;
 use atomic_refcell::AtomicRefCell;
 use bytes::{Bytes, BytesMut};
 use linux_api::errno::Errno;
+use linux_api::inet::{
+    LINUX_IP_MTU_DISCOVER, LINUX_IP_PKTINFO, LINUX_IP_PMTUDISC_WANT, LINUX_IP_RECVTOS,
+};
 use linux_api::ioctls::IoctlRequest;
 use linux_api::socket::Shutdown;
 use nix::sys::socket::{MsgFlags, SockaddrIn};
@@ -47,6 +50,7 @@ pub struct UdpSocket {
     /// The receive time of the last packet returned to the managed process during a call to
     /// `recvmsg()`. Used for `SIOCGSTAMP`.
     recv_time_of_last_read_packet: Option<EmulatedTime>,
+    ip_mtu_discover: libc::c_int,
     // should only be used by `OpenFile` to make sure there is only ever one `OpenFile` instance for
     // this file
     has_open_file: bool,
@@ -70,6 +74,7 @@ impl UdpSocket {
             bound_addr: None,
             association: None,
             recv_time_of_last_read_packet: None,
+            ip_mtu_discover: LINUX_IP_PMTUDISC_WANT.try_into().unwrap(),
             has_open_file: false,
             _counter: ObjectCounter::new("UdpSocket"),
         };
@@ -871,6 +876,13 @@ impl UdpSocket {
 
                 Ok(bytes_written as libc::socklen_t)
             }
+            (libc::IPPROTO_IP, optname) if optname == LINUX_IP_MTU_DISCOVER as libc::c_int => {
+                let optval_ptr = optval_ptr.cast::<libc::c_int>();
+                let bytes_written =
+                    write_partial(mem, &self.ip_mtu_discover, optval_ptr, optlen as usize)?;
+
+                Ok(bytes_written as libc::socklen_t)
+            }
             (libc::SOL_SOCKET, _) => {
                 log_once_per_value_at_level!(
                     (level, optname),
@@ -988,6 +1000,27 @@ impl UdpSocket {
                         "setsockopt SO_BROADCAST not yet implemented for udp; ignoring and returning 0"
                     );
                 }
+            }
+            (libc::IPPROTO_IP, optname) if optname == LINUX_IP_MTU_DISCOVER as libc::c_int => {
+                type OptType = libc::c_int;
+
+                if usize::try_from(optlen).unwrap() < std::mem::size_of::<OptType>() {
+                    return Err(Errno::EINVAL.into());
+                }
+
+                self.ip_mtu_discover = mem.read(optval_ptr.cast::<OptType>())?;
+            }
+            (libc::IPPROTO_IP, optname)
+                if optname == LINUX_IP_PKTINFO as libc::c_int
+                    || optname == LINUX_IP_RECVTOS as libc::c_int =>
+            {
+                type OptType = libc::c_int;
+
+                if usize::try_from(optlen).unwrap() < std::mem::size_of::<OptType>() {
+                    return Err(Errno::EINVAL.into());
+                }
+
+                let _enabled = mem.read::<OptType>(optval_ptr.cast::<OptType>())? != 0;
             }
             _ => {
                 log_once_per_value_at_level!(

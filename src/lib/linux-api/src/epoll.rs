@@ -61,6 +61,47 @@ bitflags::bitflags! {
 }
 
 // The `epoll_event` struct is passed as an argument to `epoll_ctl` and `epoll_wait`.
+//
+// Its layout is architecture-specific in Linux userspace. The generated bindings currently come
+// from x86_64, where the struct is packed to 12 bytes with `data` at offset 4. On aarch64 it is a
+// naturally-aligned 16-byte struct with `data` at offset 8.
+#[cfg(not(target_arch = "aarch64"))]
 #[allow(non_camel_case_types)]
 pub type epoll_event = crate::bindings::linux_epoll_event;
+
+#[cfg(target_arch = "aarch64")]
+#[allow(non_camel_case_types)]
+#[repr(C)]
+#[derive(Clone, Copy)]
+pub struct epoll_event {
+    pub events: u32,
+    pub _pad: u32,
+    pub data: u64,
+}
+
 unsafe impl shadow_pod::Pod for epoll_event {}
+
+pub fn make_epoll_event(events: u32, data: u64) -> epoll_event {
+    #[cfg(not(target_arch = "aarch64"))]
+    {
+        epoll_event { events, data }
+    }
+
+    #[cfg(target_arch = "aarch64")]
+    {
+        epoll_event {
+            events,
+            _pad: 0,
+            data,
+        }
+    }
+}
+
+#[cfg(target_arch = "aarch64")]
+static_assertions::const_assert_eq!(core::mem::size_of::<epoll_event>(), 16);
+#[cfg(target_arch = "aarch64")]
+static_assertions::const_assert_eq!(core::mem::align_of::<epoll_event>(), 8);
+#[cfg(target_arch = "aarch64")]
+static_assertions::const_assert_eq!(core::mem::offset_of!(epoll_event, events), 0);
+#[cfg(target_arch = "aarch64")]
+static_assertions::const_assert_eq!(core::mem::offset_of!(epoll_event, data), 8);
