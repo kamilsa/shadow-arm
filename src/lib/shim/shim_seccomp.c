@@ -100,9 +100,6 @@ static void* TEXT_START = NULL;
 // one thread.
 static void* TEXT_END = NULL;
 
-#ifdef __aarch64__
-__attribute__((target("general-regs-only")))
-#endif
 static void _debug_sigsys(const char* label, long syscall_num, const void* pc,
                           const void* syscall_insn_addr, long rv) {
     char buf[256];
@@ -282,25 +279,21 @@ void shim_seccomp_init() {
     }
 
 #ifdef __aarch64__
-    // Use PR_SET_SYSCALL_USER_DISPATCH instead of seccomp BPF on ARM64.
-    // This avoids the seccomp signal delivery path which corrupts FPSIMD
-    // state on virtualized ARM64 (Docker on macOS). Requires kernel >=5.11.
-    //
-    // syscall_user_dispatch intercepts any syscall instruction outside
-    // the allowed region and delivers SIGSYS with si_code=SYS_USER_DISPATCH.
-    // Syscalls from within the region go straight to the kernel.
-    //
-    // The thread-local selector can be set to ALLOW to temporarily permit
-    // syscalls from outside the region (useful for shim_native_syscall).
-    if (prctl(PR_SET_SYSCALL_USER_DISPATCH,
-              PR_SYS_DISPATCH_ON,
-              TEXT_START,
-              (uintptr_t)TEXT_END - (uintptr_t)TEXT_START,
-              &syscall_dispatch_selector) < 0) {
-        panic("prctl(PR_SET_SYSCALL_USER_DISPATCH): %s", strerror(errno));
+    // Try PR_SET_SYSCALL_USER_DISPATCH first (avoids seccomp signal path).
+    // Falls back to seccomp BPF if the kernel doesn't support it
+    // (e.g., Docker Desktop's linuxkit kernel).
+    int dispatch_rc = prctl(PR_SET_SYSCALL_USER_DISPATCH,
+                            PR_SYS_DISPATCH_ON,
+                            TEXT_START,
+                            (uintptr_t)TEXT_END - (uintptr_t)TEXT_START,
+                            &syscall_dispatch_selector);
+    if (dispatch_rc == 0) {
+        trace("syscall_user_dispatch enabled: region %p-%p", TEXT_START, TEXT_END);
+        return; // Success, skip seccomp BPF
     }
-    trace("syscall_user_dispatch enabled: region %p-%p", TEXT_START, TEXT_END);
-#else
+    // Fall through to seccomp BPF if syscall_user_dispatch is not supported.
+    trace("syscall_user_dispatch not available (errno=%d), falling back to seccomp BPF", errno);
+#endif
     // x86-64: use seccomp BPF filter (original implementation).
     // We break text start and end addresses into high and low 32 bit
     // values for use in 32 bit seccomp filter operations.
@@ -357,5 +350,4 @@ void shim_seccomp_init() {
     if (syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, SECCOMP_FILTER_FLAG_SPEC_ALLOW, &prog)) {
         panic("seccomp: %s", strerror(errno));
     }
-#endif
 }
