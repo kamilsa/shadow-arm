@@ -231,22 +231,25 @@ static void _getSectionContaining(const void* target, void** start, void** end) 
     fclose(maps);
 }
 
+// Thread-local selector for syscall_user_dispatch on ARM64.
+// Set to BLOCK normally to intercept syscalls from outside the shim.
+// Callees that need to make native syscalls can set it to ALLOW temporarily.
+#ifdef __aarch64__
+static _Thread_local char syscall_dispatch_selector = SYSCALL_DISPATCH_FILTER_BLOCK;
+#endif
+
 void shim_seccomp_init() {
     // Install signal sigsys signal handler, which will receive syscalls that
-    // get stopped by the seccomp filter. Shadow's emulation of signal-related
-    // system calls will prevent this action from later being overridden by the
-    // virtual process.
+    // get intercepted. Shadow's emulation of signal-related system calls will
+    // prevent this action from later being overridden by the virtual process.
     struct sigaction old_action;
     if (sigaction(SIGSYS,
                   &(struct sigaction){
                       .sa_sigaction = _shim_seccomp_handle_sigsys,
                       // SA_NODEFER: Allow recursive signal handling, to handle a syscall
-                      // being made during the handling of another. For example, we need this
-                      // to properly handle the case that we end up logging from the syscall
-                      // handler, and the IO syscalls themselves are trapped.
+                      // being made during the handling of another.
                       // SA_SIGINFO: Required because we're specifying sa_sigaction.
-                      // SA_ONSTACK: Use the alternate signal handling stack, to avoid interfering
-                      // with userspace thread stacks.
+                      // SA_ONSTACK: Use the alternate signal handling stack.
                       .sa_flags = SA_NODEFER | SA_SIGINFO | SA_ONSTACK,
                   },
                   &old_action) < 0) {
@@ -258,10 +261,7 @@ void shim_seccomp_init() {
                                                          : (void*)old_action.sa_sigaction);
     }
 
-    // Ensure that SIGSYS isn't blocked. This code runs in the process's first
-    // thread, so the resulting mask will be inherited by subsequent threads.
-    // Shadow's emulation of signal-related system calls will prevent it from
-    // later becoming blocked.
+    // Ensure that SIGSYS isn't blocked.
     sigset_t mask;
     sigemptyset(&mask);
     sigaddset(&mask, SIGSYS);
@@ -269,24 +269,39 @@ void shim_seccomp_init() {
         panic("sigprocmask: %s", strerror(errno));
     }
 
-    // Setting PR_SET_NO_NEW_PRIVS allows us to install a seccomp filter without
-    // CAP_SYS_ADMIN.
+    // Setting PR_SET_NO_NEW_PRIVS is required for both seccomp and syscall_user_dispatch.
     if (prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0)) {
         panic("prctl: %s", strerror(errno));
     }
 
-    // Find the region of memory containing this function. That should be
-    // the `.text` section of the shim, and contain all of the code in the shim.
+    // Find the shim's .text section for the allowed region.
     _getSectionContaining((void*)shim_seccomp_init, &TEXT_START, &TEXT_END);
     trace("text start:%p end:%p", TEXT_START, TEXT_END);
-    dprintf(STDERR_FILENO, "SECCOMP_TEXT_BOUNDS start=%p end=%p\\n", TEXT_START, TEXT_END);
-    if (TEXT_START == NULL) {
-        panic("Couldn't find memory region containing `shim_seccomp_init`");
-    }
-    if (TEXT_END == NULL) {
-        panic("bad end");
+    if (TEXT_START == NULL || TEXT_END == NULL) {
+        panic("Couldn't find shim .text section");
     }
 
+#ifdef __aarch64__
+    // Use PR_SET_SYSCALL_USER_DISPATCH instead of seccomp BPF on ARM64.
+    // This avoids the seccomp signal delivery path which corrupts FPSIMD
+    // state on virtualized ARM64 (Docker on macOS). Requires kernel >=5.11.
+    //
+    // syscall_user_dispatch intercepts any syscall instruction outside
+    // the allowed region and delivers SIGSYS with si_code=SYS_USER_DISPATCH.
+    // Syscalls from within the region go straight to the kernel.
+    //
+    // The thread-local selector can be set to ALLOW to temporarily permit
+    // syscalls from outside the region (useful for shim_native_syscall).
+    if (prctl(PR_SET_SYSCALL_USER_DISPATCH,
+              PR_SYS_DISPATCH_ON,
+              TEXT_START,
+              (uintptr_t)TEXT_END - (uintptr_t)TEXT_START,
+              &syscall_dispatch_selector) < 0) {
+        panic("prctl(PR_SET_SYSCALL_USER_DISPATCH): %s", strerror(errno));
+    }
+    trace("syscall_user_dispatch enabled: region %p-%p", TEXT_START, TEXT_END);
+#else
+    // x86-64: use seccomp BPF filter (original implementation).
     // We break text start and end addresses into high and low 32 bit
     // values for use in 32 bit seccomp filter operations.
     uint32_t text_start_high = (uintptr_t)TEXT_START >> 32;
@@ -294,106 +309,44 @@ void shim_seccomp_init() {
     uint32_t text_end_high = (uintptr_t)TEXT_END >> 32;
     uint32_t text_end_low = (uintptr_t)TEXT_END;
 
-    /* A bpf program to be loaded as a `seccomp` filter. Unfortunately the
-     * documentation for how to write this is pretty sparse. There's a useful
-     * example in samples/seccomp/bpf-direct.c of the Linux kernel source tree.
-     * The best reference I've been able to find is a BSD man page:
-     * https://www.freebsd.org/cgi/man.cgi?query=bpf&sektion=4&manpath=FreeBSD+4.7-RELEASE
-     *
-     * CAUTION: while that page annotates `k` as a `u_long`, `k` is only 32 bits.
-     *
-     * TODO: Consider moving filter generation into Rust, where we might be able
-     * to avoid some footguns (like implicit 64->32 bit conversions), and potentially
-     * into the Shadow process where we might be able to use some 3rd party libraries
-     * such as `libseccomp` (which unfortunately doesn't support address range filters
-     * https://github.com/seccomp/libseccomp/issues/113)
-     *
-     * Better yet, consider migrating to `PR_SET_SYSCALL_USER_DISPATCH`, which implements
-     * *almost* the seccomp filter we're creating here. It requires minimum kernel
-     * version 5.11, though.
-     * https://www.kernel.org/doc./html/latest/admin-guide/syscall-user-dispatch.html
-     */
     struct sock_filter filter[] = {
-        /* accumulator := syscall number */
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, offsetof(struct seccomp_data, nr)),
-
-        /* Always allow sigreturn; otherwise we'd crash returning from our signal handler. */
         BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, SYS_rt_sigreturn, /*true-skip=*/0, /*false-skip=*/1),
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW),
 
-    /* This block was intended to whitelist reads and writes to a socket
-     * used to communicate with Shadow. It turns out to be unnecessary though,
-     * because the functions we're using are already wrapped, and so go through
-     * shim_native_syscallv, and so end up already being whitelisted above based on that.
-     * (Also ended up switching back to shared-mem-based IPC instead of a socket).
-     *
-     * Keeping the code around for now in case we end up needing it or something similar.
-     */
 #if 0
-        /* check_socket: Allow reads and writes to shadow socket */
-        BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, SYS_read, 0, 2/*check_fd*/),
-        BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, SYS_write, 0, 1/*check_fd*/),
-        /* Skip to instruction pointer check */
-        BPF_JUMP(BPF_JMP+BPF_JA, 3/* check_ip */, 0, 0),
-        /* check_fd */
-        /* accumulator := arg1 */
+        BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, SYS_read, 0, 2),
+        BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, SYS_write, 0, 1),
+        BPF_JUMP(BPF_JMP+BPF_JA, 3, 0, 0),
         BPF_STMT(BPF_LD+BPF_W+BPF_ABS, offsetof(struct seccomp_data, args[0])),
-        BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, toShadowFd, 0, 1/* check_ip */),
+        BPF_JUMP(BPF_JMP+BPF_JEQ+BPF_K, toShadowFd, 0, 1),
         BPF_STMT(BPF_RET+BPF_K, SECCOMP_RET_ALLOW),
 #endif
 
-        /* Allow syscalls made from the `.text` section.
-         * We allow-list native syscalls made from this region both for correctness
-         * (to avoid recursing in our syscall handling) and performance (avoid the
-         * interception overhead in internal synchronization primitives).
-         *
-         * We need to compare a 64-bit instruction pointer to 64-bit addresses.
-         * Unfortunately seccomp's BPF only supports 32-bit values, so we need
-         * to compare the high and low 32-bits separately.
-         *
-         * According to seccomp(2), the instruction pointer we load here should
-         * be the address of the `syscall` instruction itself, *not* the address
-         * of the *next* instruction, which is what we get in the signal handler.
-         *
-         * In comments below we use:
-         * IP_high: high 32 bits of instruction pointer
-         * IP_low: low 32 bits of instruction pointer
-         */
-
-        /* if (IP_high > text_end_high) trap; */
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS,
                  offsetof(struct seccomp_data, instruction_pointer) + sizeof(int32_t)),
-        BPF_JUMP(BPF_JMP + BPF_JGT + BPF_K, text_end_high,
-                 /*true-skip=*/0, /*false-skip=*/1),
+        BPF_JUMP(BPF_JMP + BPF_JGT + BPF_K, text_end_high, /*true-skip=*/0, /*false-skip=*/1),
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_TRAP),
 
-        /* if (IP_high == text_end_high && IP_low >= text_end_low) trap; */
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS,
                  offsetof(struct seccomp_data, instruction_pointer) + sizeof(int32_t)),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, text_end_high,
-                 /*true-skip=*/0, /*false-skip=*/3),
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, text_end_high, /*true-skip=*/0, /*false-skip=*/3),
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, offsetof(struct seccomp_data, instruction_pointer)),
-        BPF_JUMP(BPF_JMP + BPF_JGE + BPF_K, text_end_low,
-                 /*true-skip=*/0, /*false-skip=*/1),
+        BPF_JUMP(BPF_JMP + BPF_JGE + BPF_K, text_end_low, /*true-skip=*/0, /*false-skip=*/1),
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_TRAP),
 
-        /* if (IP_high < text_start_high) trap; */
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS,
                  offsetof(struct seccomp_data, instruction_pointer) + sizeof(int32_t)),
         BPF_JUMP(BPF_JMP + BPF_JGE + BPF_K, text_start_high, /*true-skip=*/1, /*false-skip=*/0),
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_TRAP),
 
-        /* if (IP_high == text_start_high && IP_low < text_start_low) trap; */
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS,
                  offsetof(struct seccomp_data, instruction_pointer) + sizeof(int32_t)),
-        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, text_start_high,
-                 /*true-skip=*/0, /*false-skip=*/3),
+        BPF_JUMP(BPF_JMP + BPF_JEQ + BPF_K, text_start_high, /*true-skip=*/0, /*false-skip=*/3),
         BPF_STMT(BPF_LD + BPF_W + BPF_ABS, offsetof(struct seccomp_data, instruction_pointer)),
-        BPF_JUMP(BPF_JMP + BPF_JGE + BPF_K, text_start_low,
-                 /*true-skip=*/1, /*false-skip=*/0),
+        BPF_JUMP(BPF_JMP + BPF_JGE + BPF_K, text_start_low, /*true-skip=*/1, /*false-skip=*/0),
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_TRAP),
 
-        /* Allow  */
         BPF_STMT(BPF_RET + BPF_K, SECCOMP_RET_ALLOW),
     };
     struct sock_fprog prog = {
@@ -401,13 +354,8 @@ void shim_seccomp_init() {
         .filter = filter,
     };
 
-    // Re SECCOMP_FILTER_FLAG_SPEC_ALLOW: Without this flag, installing a
-    // seccomp filter sets the PR_SPEC_FORCE_DISABLE bit (see prctl(2)). This
-    // results in a significant performance penalty. Meanwhile Shadow is
-    // semi-cooperative with its virtual processes; it doesn't try to protect
-    // itself or the system from malicious code. Hence, it isn't worth paying
-    // this overhead.
     if (syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, SECCOMP_FILTER_FLAG_SPEC_ALLOW, &prog)) {
         panic("seccomp: %s", strerror(errno));
     }
+#endif
 }
