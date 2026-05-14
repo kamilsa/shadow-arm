@@ -31,6 +31,7 @@ struct fpsimd_save {
     __uint128_t vregs[32];
     __uint32_t fpsr;
     __uint32_t fpcr;
+    __uint64_t tpidr_el0;
 };
 static _Thread_local struct fpsimd_save fpsimd_save_buf;
 
@@ -56,8 +57,10 @@ static void fpsimd_save(struct fpsimd_save* buf) {
         "mrs %x2, fpcr\n\t"
         "str w1, [%0, #512]\n\t"
         "str w2, [%0, #516]\n\t"
+        "mrs %x3, tpidr_el0\n\t"
+        "str x3, [%0, #520]\n\t"
         :
-        : "r"(buf->vregs), "r"(&buf->fpsr), "r"(&buf->fpcr)
+        : "r"(buf->vregs), "r"(&buf->fpsr), "r"(&buf->fpcr), "r"(&buf->tpidr_el0)
         : "memory"
     );
 }
@@ -84,8 +87,10 @@ static void fpsimd_restore(const struct fpsimd_save* buf) {
         "ldr w2, [%0, #516]\n\t"
         "msr fpsr, x1\n\t"
         "msr fpcr, x2\n\t"
+        "ldr x3, [%0, #520]\n\t"
+        "msr tpidr_el0, x3\n\t"
         :
-        : "r"(buf->vregs), "r"(&buf->fpsr), "r"(&buf->fpcr)
+        : "r"(buf->vregs), "r"(&buf->fpsr), "r"(&buf->fpcr), "r"(&buf->tpidr_el0)
         : "memory"
     );
 }

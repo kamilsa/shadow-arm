@@ -373,6 +373,49 @@ unsafe fn handle_hardware_error_signal_inner(
         }
     });
 
+    // Dump crash info for ARM64 debugging
+    #[cfg(target_arch = "aarch64")]
+    if let Some(ref uctx) = uctx {
+        let pc = uctx.uc_mcontext.pc;
+        let sp = uctx.uc_mcontext.sp;
+        let x0 = uctx.uc_mcontext.regs[0];
+        let x22 = uctx.uc_mcontext.regs[22];
+        let x23 = uctx.uc_mcontext.regs[23];
+        let lr = uctx.uc_mcontext.regs[30];
+        let stderr = unsafe { rustix::fd::BorrowedFd::borrow_raw(2) };
+        // Write crash info as simple hex + newlines
+        let _ = rustix::io::write(stderr, b"CRASH pc=");
+        for shift in (0..64).step_by(4).rev() {
+            let nib = ((pc >> shift) & 0xf) as u8;
+            let _ = rustix::io::write(stderr, &[b"0123456789abcdef"[nib as usize]]);
+        }
+        let _ = rustix::io::write(stderr, b"\nCRASH sp=");
+        for shift in (0..64).step_by(4).rev() {
+            let nib = ((sp >> shift) & 0xf) as u8;
+            let _ = rustix::io::write(stderr, &[b"0123456789abcdef"[nib as usize]]);
+        }
+        let _ = rustix::io::write(stderr, b"\nCRASH x0=");
+        for shift in (0..64).step_by(4).rev() {
+            let nib = ((x0 >> shift) & 0xf) as u8;
+            let _ = rustix::io::write(stderr, &[b"0123456789abcdef"[nib as usize]]);
+        }
+        let _ = rustix::io::write(stderr, b"\nCRASH x22=");
+        for shift in (0..64).step_by(4).rev() {
+            let nib = ((x22 >> shift) & 0xf) as u8;
+            let _ = rustix::io::write(stderr, &[b"0123456789abcdef"[nib as usize]]);
+        }
+        let _ = rustix::io::write(stderr, b"\nCRASH x23=");
+        for shift in (0..64).step_by(4).rev() {
+            let nib = ((x23 >> shift) & 0xf) as u8;
+            let _ = rustix::io::write(stderr, &[b"0123456789abcdef"[nib as usize]]);
+        }
+        let _ = rustix::io::write(stderr, b"\nCRASH lr=");
+        for shift in (0..64).step_by(4).rev() {
+            let nib = ((lr >> shift) & 0xf) as u8;
+            let _ = rustix::io::write(stderr, &[b"0123456789abcdef"[nib as usize]]);
+        }
+        let _ = rustix::io::write(stderr, b"\n");
+    }
     unsafe { process_signals(uctx) };
 }
 
