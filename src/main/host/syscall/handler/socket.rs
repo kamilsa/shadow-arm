@@ -504,6 +504,64 @@ impl SyscallHandler {
     }
 
     log_syscall!(
+        recvmmsg,
+        /* rv */ std::ffi::c_int,
+        /* sockfd */ std::ffi::c_int,
+        /* msgvec */ *const std::ffi::c_void,
+        /* vlen */ std::ffi::c_uint,
+        /* flags */ std::ffi::c_int,
+        /* timeout */ *const std::ffi::c_void,
+    );
+    pub fn recvmmsg(
+        ctx: &mut SyscallContext,
+        fd: std::ffi::c_int,
+        msgvec_ptr: ForeignPtr<libc::mmsghdr>,
+        vlen: std::ffi::c_uint,
+        _flags: std::ffi::c_int,
+        _timeout_ptr: ForeignPtr<libc::timespec>,
+    ) -> Result<std::ffi::c_int, SyscallError> {
+        let vlen: usize = vlen.try_into().unwrap();
+        if vlen == 0 {
+            return Err(Errno::EINVAL.into());
+        }
+
+        let mmsghdr_size = std::mem::size_of::<libc::mmsghdr>();
+        let msghdr_size = std::mem::size_of::<libc::msghdr>();
+        // msg_len is after msg_hdr in struct mmsghdr
+        let msg_len_byte_offset = msghdr_size;
+
+        let mut count: std::ffi::c_int = 0;
+
+        for i in 0..vlen {
+            // Pointer to the i-th msghdr embedded in the i-th mmsghdr
+            let msg_ptr: ForeignPtr<libc::msghdr> = msgvec_ptr
+                .cast::<u8>()
+                .add(i * mmsghdr_size)
+                .cast::<libc::msghdr>();
+
+            match Self::recvmsg(ctx, fd, msg_ptr, libc::MSG_DONTWAIT) {
+                Ok(recvd) => {
+                    // Write msg_len at offset msghdr_size inside the i-th mmsghdr
+                    let mm_len_ptr: ForeignPtr<libc::c_uint> = msgvec_ptr
+                        .cast::<u8>()
+                        .add(i * mmsghdr_size + msg_len_byte_offset)
+                        .cast::<libc::c_uint>();
+                    ctx.objs.process.memory_borrow_mut().write(mm_len_ptr, &(recvd as libc::c_uint))?;
+                    count += 1;
+                }
+                Err(e) if count > 0 => {
+                    return Ok(count);
+                }
+                Err(e) => {
+                    return Err(e);
+                }
+            }
+        }
+
+        Ok(count)
+    }
+
+    log_syscall!(
         getsockname,
         /* rv */ std::ffi::c_int,
         /* sockfd */ std::ffi::c_int,

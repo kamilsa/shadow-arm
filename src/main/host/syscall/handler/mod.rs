@@ -564,6 +564,7 @@ impl SyscallHandler {
             SyscallNum::NR_readlinkat => handle!(readlinkat),
             SyscallNum::NR_readv => handle!(readv),
             SyscallNum::NR_recvfrom => handle!(recvfrom),
+            SyscallNum::NR_recvmmsg => handle!(recvmmsg),
             SyscallNum::NR_recvmsg => handle!(recvmsg),
             SyscallNum::NR_renameat => handle!(renameat),
             SyscallNum::NR_renameat2 => handle!(renameat2),
