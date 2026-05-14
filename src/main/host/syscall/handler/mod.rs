@@ -523,7 +523,7 @@ impl SyscallHandler {
             SyscallNum::NR_getrandom => handle!(getrandom),
             SyscallNum::NR_getrlimit => handle!(getrlimit),
             SyscallNum::NR_getsid => handle!(getsid),
-            SyscallNum::NR_getsockname => handle!(getsockname),
+            SyscallNum::NR_getsockname => { return Err(SyscallError::Native); },
             SyscallNum::NR_getsockopt => handle!(getsockopt),
             SyscallNum::NR_gettid => handle!(gettid),
             SyscallNum::NR_ioctl => handle!(ioctl),
