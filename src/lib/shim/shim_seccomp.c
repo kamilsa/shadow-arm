@@ -22,6 +22,75 @@
 #include "lib/shim/shim_syscall.h"
 #include "lib/shim/shim_tls.h"
 
+// Per-thread FPSIMD save buffer for the SIGSYS handler.
+// On ARM64, callees of the handler may use NEON/SIMD registers.
+// We save all Q registers + FPSR/FPCR at handler entry and restore at exit
+// to prevent the managed process from seeing corrupted NEON state.
+#ifdef __aarch64__
+struct fpsimd_save {
+    __uint128_t vregs[32];
+    __uint32_t fpsr;
+    __uint32_t fpcr;
+};
+static _Thread_local struct fpsimd_save fpsimd_save_buf;
+
+static void fpsimd_save(struct fpsimd_save* buf) {
+    __asm__ volatile(
+        "stp q0, q1, [%0, #0]\n\t"
+        "stp q2, q3, [%0, #32]\n\t"
+        "stp q4, q5, [%0, #64]\n\t"
+        "stp q6, q7, [%0, #96]\n\t"
+        "stp q8, q9, [%0, #128]\n\t"
+        "stp q10, q11, [%0, #160]\n\t"
+        "stp q12, q13, [%0, #192]\n\t"
+        "stp q14, q15, [%0, #224]\n\t"
+        "stp q16, q17, [%0, #256]\n\t"
+        "stp q18, q19, [%0, #288]\n\t"
+        "stp q20, q21, [%0, #320]\n\t"
+        "stp q22, q23, [%0, #352]\n\t"
+        "stp q24, q25, [%0, #384]\n\t"
+        "stp q26, q27, [%0, #416]\n\t"
+        "stp q28, q29, [%0, #448]\n\t"
+        "stp q30, q31, [%0, #480]\n\t"
+        "mrs %x1, fpsr\n\t"
+        "mrs %x2, fpcr\n\t"
+        "str w1, [%0, #512]\n\t"
+        "str w2, [%0, #516]\n\t"
+        :
+        : "r"(buf->vregs), "r"(&buf->fpsr), "r"(&buf->fpcr)
+        : "memory"
+    );
+}
+
+static void fpsimd_restore(const struct fpsimd_save* buf) {
+    __asm__ volatile(
+        "ldp q0, q1, [%0, #0]\n\t"
+        "ldp q2, q3, [%0, #32]\n\t"
+        "ldp q4, q5, [%0, #64]\n\t"
+        "ldp q6, q7, [%0, #96]\n\t"
+        "ldp q8, q9, [%0, #128]\n\t"
+        "ldp q10, q11, [%0, #160]\n\t"
+        "ldp q12, q13, [%0, #192]\n\t"
+        "ldp q14, q15, [%0, #224]\n\t"
+        "ldp q16, q17, [%0, #256]\n\t"
+        "ldp q18, q19, [%0, #288]\n\t"
+        "ldp q20, q21, [%0, #320]\n\t"
+        "ldp q22, q23, [%0, #352]\n\t"
+        "ldp q24, q25, [%0, #384]\n\t"
+        "ldp q26, q27, [%0, #416]\n\t"
+        "ldp q28, q29, [%0, #448]\n\t"
+        "ldp q30, q31, [%0, #480]\n\t"
+        "ldr w1, [%0, #512]\n\t"
+        "ldr w2, [%0, #516]\n\t"
+        "msr fpsr, x1\n\t"
+        "msr fpcr, x2\n\t"
+        :
+        : "r"(buf->vregs), "r"(&buf->fpsr), "r"(&buf->fpcr)
+        : "memory"
+    );
+}
+#endif
+
 // Start of shim's text (code) segment. Inclusive.
 // Immutable after global initialization, which should be done exactly once by
 // one thread.
@@ -31,6 +100,9 @@ static void* TEXT_START = NULL;
 // one thread.
 static void* TEXT_END = NULL;
 
+#ifdef __aarch64__
+__attribute__((target("general-regs-only")))
+#endif
 static void _debug_sigsys(const char* label, long syscall_num, const void* pc,
                           const void* syscall_insn_addr, long rv) {
     char buf[256];
@@ -46,7 +118,17 @@ static void _debug_sigsys(const char* label, long syscall_num, const void* pc,
 }
 
 // Handler function that receives syscalls that are stopped by the seccomp filter.
+#ifdef __aarch64__
+__attribute__((target("general-regs-only")))
+#endif
 static void _shim_seccomp_handle_sigsys(int sig, siginfo_t* info, void* voidUcontext) {
+#ifdef __aarch64__
+    // Save NEON/SIMD state before any callee clobbers it.
+    // The kernel saves FPSIMD on the signal stack, but callees of this handler
+    // (shim_syscall, Rust code, libc) may use NEON and modify registers.
+    // We save to a per-thread buffer to avoid touching the signal stack.
+    fpsimd_save(&fpsimd_save_buf);
+#endif
     ExecutionContext prev_ctx = shim_swapExecutionContext(EXECUTION_CONTEXT_SHADOW);
     ucontext_t* ctx = (ucontext_t*)(voidUcontext);
     if (sig != SIGSYS) {
@@ -95,12 +177,20 @@ static void _shim_seccomp_handle_sigsys(int sig, siginfo_t* info, void* voidUcon
     // libc's).  It in turn will either emulate it or (if interposition is
     // disabled), make the call natively. In the latter case, the syscall
     // will be permitted to execute by the seccomp filter.
+    // Make the syscall via the *the shim's* syscall function (which overrides
+    // libc's).  It in turn will either emulate it or (if interposition is
+    // disabled), make the call natively. In the latter case, the syscall
+    // will be permitted to execute by the seccomp filter.
     long rv = shim_syscall(ctx, prev_ctx, syscall_num, arg1, arg2,
                            arg3, arg4, arg5, arg6);
     trace("Trapped syscall %ld returning %ld", syscall_num, rv);
     _debug_sigsys("return", syscall_num, pc, syscall_insn_addr, rv);
     *return_reg = rv;
     shim_swapExecutionContext(prev_ctx);
+#ifdef __aarch64__
+    // Restore NEON/SIMD state that callees may have clobbered.
+    fpsimd_restore(&fpsimd_save_buf);
+#endif
 #undef SIZEOF_SYSCALL_INSN
 }
 
@@ -189,6 +279,7 @@ void shim_seccomp_init() {
     // the `.text` section of the shim, and contain all of the code in the shim.
     _getSectionContaining((void*)shim_seccomp_init, &TEXT_START, &TEXT_END);
     trace("text start:%p end:%p", TEXT_START, TEXT_END);
+    dprintf(STDERR_FILENO, "SECCOMP_TEXT_BOUNDS start=%p end=%p\\n", TEXT_START, TEXT_END);
     if (TEXT_START == NULL) {
         panic("Couldn't find memory region containing `shim_seccomp_init`");
     }
