@@ -265,7 +265,6 @@ impl Pipe {
             // that are passed through to linux have the uid/gid of the user running the simulation
             st_uid: 0,
             st_gid: 0,
-            l__pad0: 0,
             st_rdev: 0,
             // apparently the behaviour of this field depends on what unix you're running, but on
             // linux it seems to always be 0
@@ -279,7 +278,16 @@ impl Pipe {
             st_mtime_nsec: 0,
             st_ctime: 0,
             st_ctime_nsec: 0,
+            #[cfg(target_arch = "x86_64")]
+            l__pad0: 0,
+            #[cfg(target_arch = "x86_64")]
             l__unused: [0; 3],
+            #[cfg(target_arch = "aarch64")]
+            __pad0: 0,
+            #[cfg(target_arch = "aarch64")]
+            __pad1: 0,
+            #[cfg(target_arch = "aarch64")]
+            __unused: [0; 1],
         })
     }
 
