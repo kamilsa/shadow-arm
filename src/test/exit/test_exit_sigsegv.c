@@ -7,5 +7,10 @@ int main() {
     // We use assembly here to ensure we really access the NULL pointer and get a
     // SEGV. Done at the C level, the compiler could detect undefined behavior
     // and do something else.
+    #ifdef __x86_64__
     asm("mov 0, %rax");
+    #else
+    // On ARM64, dereference address 0 to trigger SIGSEGV
+    asm("mov x0, #0\n\tldr x0, [x0]");
+    #endif
 }
