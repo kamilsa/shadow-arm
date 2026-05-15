@@ -7,5 +7,11 @@ int main() {
     // We use assembly here to ensure we really access the NULL pointer and get a
     // SEGV. Done at the C level, the compiler could detect undefined behavior
     // and do something else.
+#if defined(__x86_64__)
     asm("mov 0, %rax");
+#elif defined(__aarch64__)
+    asm("mov x0, 0\nldr x1, [x0]");
+#else
+#error "Unsupported architecture"
+#endif
 }

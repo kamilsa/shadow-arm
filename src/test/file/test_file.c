@@ -790,9 +790,11 @@ static void _test_faccessat() { _test_faccessat_helper(faccessat); }
 static void _test_faccessat_syscall() { _test_faccessat_helper(faccessat_syscall); }
 static void _test_faccessat2_syscall() { _test_faccessat_helper(faccessat2_syscall); }
 
-int futimesat_syscall(int dirfd, const char* pathname, const struct timeval times[2]) {
+#ifdef __x86_64__
+long futimesat_syscall(int dirfd, const char* pathname, const struct timeval times[2]) {
     return syscall(SYS_futimesat, dirfd, pathname, times);
 }
+#endif
 
 // Some syscalls are documented as returning ENOENT for an empty path, but most
 // don't document the behaviour when the path is empty. Ideally we would have
@@ -865,6 +867,7 @@ static void _test_empty_paths() {
 
     ////////// futimesat //////////
 
+#ifdef __x86_64__
     const struct timeval times_timeval[2] = {0};
 
     // Test an empty path.
@@ -880,6 +883,7 @@ static void _test_empty_paths() {
 
     // Test the current working directory.
     assert_nonneg_errno(futimesat_syscall(AT_FDCWD, ".", times_timeval));
+#endif
 
     ////////// utimensat //////////
 

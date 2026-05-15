@@ -18,7 +18,9 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
+#ifdef __x86_64__
 #include <asm/ldt.h>
+#endif
 
 #include "test/test_common.h"
 #include "test/test_glib_helpers.h"
@@ -26,6 +28,7 @@
 #define CLONE_TEST_STACK_NBYTES (4*4096)
 
 // Common flags to CLONE used throughout.
+#ifdef __x86_64__
 #define CLONE_FLAGS                                                                                \
     (CLONE_VM        /* Share process memory */                                                    \
      | CLONE_FS      /* Share file attributes */                                                   \
@@ -34,6 +37,15 @@
      | CLONE_THREAD  /* Share thread-group */                                                      \
      | CLONE_SYSVSEM /* Share semaphore values */                                                  \
      | CLONE_SETTLS) /* Set thread-local-storage */
+#else
+#define CLONE_FLAGS                                                                                \
+    (CLONE_VM        /* Share process memory */                                                    \
+     | CLONE_FS      /* Share file attributes */                                                   \
+     | CLONE_FILES   /* Share open files */                                                        \
+     | CLONE_SIGHAND /* Share signal dispositions */                                               \
+     | CLONE_THREAD  /* Share thread-group */                                                      \
+     | CLONE_SYSVSEM) /* Share semaphore values */
+#endif
 
 // The "empty" descriptor. We use this to create threads without TLS set up.
 // See arch/x86/include/asm/desc.h and arch/x86/kernel/ldt.c in Linux source.
@@ -47,7 +59,12 @@
 // don't think there's a way to do it without interfering with libc's global
 // state. We might be able to do it if this entire test and the shim were
 // completely free of libc dependencies.
+#ifdef __x86_64__
 struct user_desc LDT_EMPTY = {.read_exec_only = 1, .seg_not_present = 1};
+#define TLS_ARG &LDT_EMPTY
+#else
+#define TLS_ARG NULL
+#endif
 
 _Noreturn static void _exit_thread(int code) {
     // Exit only this thread. On some platforms returning would result in a
@@ -107,7 +124,7 @@ static void _clone_child_exits_after_leader() {
         _make_stack(&stack_top, &stack_bottom);
 
         int child_tid = clone(_clone_child_exits_after_leader_waitee_thread, stack_top,
-                              CLONE_FLAGS | CLONE_CHILD_CLEARTID, NULL, NULL, &LDT_EMPTY, ctid);
+                              CLONE_FLAGS | CLONE_CHILD_CLEARTID, NULL, NULL, TLS_ARG, ctid);
         g_assert_cmpint(child_tid, >, 0);
 
         // Intentionally leak `stack`.
@@ -123,7 +140,7 @@ static void _clone_child_exits_after_leader() {
         _make_stack(&stack_top, &stack_bottom);
 
         int child_tid = clone(_clone_child_exits_after_leader_waiter_thread, stack_top, CLONE_FLAGS,
-                              ctid, NULL, &LDT_EMPTY, NULL);
+                              ctid, NULL, TLS_ARG, NULL);
         g_assert_cmpint(child_tid, >, 0);
 
         // Intentionally leak `stack`.

@@ -549,7 +549,7 @@ impl SyscallHandler {
                     ctx.objs.process.memory_borrow_mut().write(mm_len_ptr, &(recvd as libc::c_uint))?;
                     count += 1;
                 }
-                Err(e) if count > 0 => {
+                Err(_e) if count > 0 => {
                     return Ok(count);
                 }
                 Err(e) => {

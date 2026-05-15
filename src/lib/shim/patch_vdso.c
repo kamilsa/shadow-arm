@@ -160,7 +160,7 @@ static int _replacement_clock_getres(void* arg1, void* arg2) {
     return (int)syscall(SYS_clock_getres, arg1, arg2);
 }
 
-#ifdef SYS_getcpu
+#if defined(SYS_getcpu) && defined(__x86_64__)
 static int _replacement_getcpu(void* arg1, void* arg2, void* arg3) {
     return (int)syscall(SYS_getcpu, arg1, arg2, arg3);
 }

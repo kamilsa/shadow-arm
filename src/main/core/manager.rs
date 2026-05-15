@@ -9,7 +9,9 @@ use std::time::Duration;
 
 use anyhow::Context;
 use atomic_refcell::AtomicRefCell;
+#[cfg(target_arch = "x86_64")]
 use linux_api::prctl::ArchPrctlOp;
+#[allow(unused_imports)]
 use log::{debug, warn};
 use rand::seq::SliceRandom;
 use rand_xoshiro::Xoshiro256PlusPlus;

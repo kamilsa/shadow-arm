@@ -296,7 +296,7 @@ pub unsafe fn fork_raw() -> Result<core::ffi::c_long, Errno> {
 #[cfg(target_arch = "aarch64")]
 pub unsafe fn fork_raw() -> Result<core::ffi::c_long, Errno> {
     // ARM64 doesn't have a fork syscall; use clone(SIGCHLD) instead.
-    let flags = CloneFlags::empty().bits();
+    let flags = CloneFlags::empty().bits() | (crate::bindings::LINUX_SIGCHLD as u64);
     let child_stack: usize = 0;
     let ptid: *mut i32 = core::ptr::null_mut();
     let ctid: *mut i32 = core::ptr::null_mut();

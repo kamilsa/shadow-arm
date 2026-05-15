@@ -1,3 +1,4 @@
+#![allow(unused_imports, dead_code, unused_variables)]
 #[cfg(target_arch = "x86_64")]
 use std::arch::asm;
 use std::error::Error;

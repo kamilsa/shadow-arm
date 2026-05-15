@@ -33,10 +33,12 @@ pub mod cpuid {
 /// ARM64 stub for the x86-only tsc module.
 #[cfg(target_arch = "aarch64")]
 pub mod tsc {
+    #![allow(non_snake_case)]
     /// Stub Tsc that satisfies the type signatures used by Host.
     /// On ARM64 this is never actually used for emulation (no rdtsc instruction).
     #[repr(C)]
     pub struct Tsc {
+        #[allow(non_snake_case)]
         pub cyclesPerSecond: u64,
     }
     impl Tsc {
@@ -56,6 +58,7 @@ pub mod tsc {
 ///
 /// SAFETY: `ip` must be a dereferenceable pointer, pointing to the beginning
 /// of a valid x86_64 instruction, and `insn` must be a valid x86_64 instruction.
+#[cfg(target_arch = "x86_64")]
 unsafe fn ip_matches(ip: *const u8, insn: &[u8]) -> bool {
     // SAFETY:
     // * Caller has guaranteed that `ip` points to some valid instruction.

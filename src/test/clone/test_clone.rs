@@ -86,7 +86,7 @@ fn test_clone_minimal() -> Result<(), Box<dyn Error>> {
         | CloneFlags::CLONE_SIGHAND
         | CloneFlags::CLONE_THREAD
         | CloneFlags::CLONE_SYSVSEM
-        | CloneFlags::CLONE_SETTLS;
+        | CLONE_SETTLS;
     let child = unsafe {
         libc::clone(
             thread_fn,
@@ -120,7 +120,7 @@ fn test_bad_flags() -> Result<(), Box<dyn Error>> {
         | CloneFlags::CLONE_CLEAR_SIGHAND
         | CloneFlags::CLONE_THREAD
         | CloneFlags::CLONE_SYSVSEM
-        | CloneFlags::CLONE_SETTLS;
+        | CLONE_SETTLS;
     result_assert_eq(
         unsafe {
             // We have to use clone3 here to be able to pass CLONE_CLEAR_SIGHAND
@@ -186,7 +186,7 @@ fn test_clone_clear_tid() -> Result<(), Box<dyn Error>> {
         | CloneFlags::CLONE_SIGHAND
         | CloneFlags::CLONE_THREAD
         | CloneFlags::CLONE_SYSVSEM
-        | CloneFlags::CLONE_SETTLS
+        | CLONE_SETTLS
         | CloneFlags::CLONE_CHILD_CLEARTID;
     let child = unsafe {
         libc::clone(
@@ -255,7 +255,7 @@ fn test_clone_files_description_offset(use_clone_files_flag: bool) -> Result<(),
         | CloneFlags::CLONE_SIGHAND
         | CloneFlags::CLONE_THREAD
         | CloneFlags::CLONE_SYSVSEM
-        | CloneFlags::CLONE_SETTLS
+        | CLONE_SETTLS
         | CloneFlags::CLONE_CHILD_CLEARTID;
     if use_clone_files_flag {
         flags |= CloneFlags::CLONE_FILES;
@@ -311,7 +311,7 @@ fn test_clone_files_dup(use_clone_files_flag: bool) -> Result<(), Box<dyn Error>
         | CloneFlags::CLONE_SIGHAND
         | CloneFlags::CLONE_THREAD
         | CloneFlags::CLONE_SYSVSEM
-        | CloneFlags::CLONE_SETTLS
+        | CLONE_SETTLS
         | CloneFlags::CLONE_CHILD_CLEARTID;
     if use_clone_files_flag {
         flags |= CloneFlags::CLONE_FILES;
@@ -363,7 +363,7 @@ fn test_parent(use_clone_parent_flag: bool) -> Result<(), Box<dyn Error>> {
     let mut flags = CloneFlags::CLONE_VM
         | CloneFlags::CLONE_SIGHAND
         | CloneFlags::CLONE_THREAD
-        | CloneFlags::CLONE_SETTLS
+        | CLONE_SETTLS
         | CloneFlags::CLONE_CHILD_CLEARTID;
     if use_clone_parent_flag {
         flags |= CloneFlags::CLONE_FILES;
