@@ -11,13 +11,17 @@ use nix::sys::signal;
 use nix::sys::signal::Signal;
 use nix::unistd;
 use once_cell::sync::OnceCell;
+#[cfg(target_arch = "x86_64")]
 use rustix::thread::NanosleepRelativeResult;
+#[cfg(target_arch = "x86_64")]
 use rustix::time::Timespec;
 use signal_hook::low_level::channel::Channel as SignalSafeChannel;
 use test_utils::ShadowTest;
 use test_utils::TestEnvironment as TestEnv;
+#[cfg(target_arch = "x86_64")]
 use test_utils::running_in_shadow;
 use test_utils::set;
+#[cfg(target_arch = "x86_64")]
 use test_utils::setitimer;
 
 const SS_AUTODISARM: libc::c_int = 1 << 31;
@@ -942,6 +946,7 @@ fn test_sigaltstack_old_efault() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(target_arch = "x86_64")]
 static GLOBAL_STATIC: u32 = 0xdeadbeef;
 #[cfg(target_arch = "x86_64")]
 extern "C" fn change_rax_from_null_to_global_static(
@@ -1017,9 +1022,12 @@ fn test_synchronous_sigsegv() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(target_arch = "x86_64")]
 static mut LAST_ERROR_SIGNAL: i32 = 0;
+#[cfg(target_arch = "x86_64")]
 static mut RECOVERY_POINT: *mut libc::ucontext_t = std::ptr::null_mut();
 
+#[cfg(target_arch = "x86_64")]
 extern "C" fn recover_from_hardware_error(
     signal: i32,
     info: *mut libc::siginfo_t,
@@ -1035,6 +1043,7 @@ extern "C" fn recover_from_hardware_error(
     panic!("Unreachable");
 }
 
+#[cfg(target_arch = "x86_64")]
 fn test_hardware_error_signal<F: FnOnce()>(
     sig: signal::Signal,
     setcontext_and_raise_err: F,
@@ -1125,11 +1134,13 @@ fn test_hardware_error_signals() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(target_arch = "x86_64")]
 #[derive(Debug, Eq, PartialEq)]
 struct DoSetcontextHandlerResult {
     // The value of rax seen by the signal handler.
     ctx_rax: i64,
 }
+#[cfg(target_arch = "x86_64")]
 static mut DO_SETCONTEXT_RES: Option<DoSetcontextHandlerResult> = None;
 
 #[cfg(target_arch = "x86_64")]

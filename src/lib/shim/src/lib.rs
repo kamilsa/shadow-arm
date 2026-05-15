@@ -8,6 +8,7 @@ use core::mem::MaybeUninit;
 
 use crate::tls::ShimTlsVar;
 
+#[cfg(target_arch = "x86_64")]
 use linux_api::prctl::ArchPrctlOp;
 use linux_api::signal::{SigProcMaskAction, rt_sigprocmask};
 use num_enum::{IntoPrimitive, TryFromPrimitive};
@@ -608,7 +609,7 @@ fn wait_for_start_event(is_first_thread: bool) {
         ipc.to_shadow().send(start_req);
         ipc.from_shadow().receive().unwrap()
     });
-    let ShimEventToShim::StartRes(res) = res else {
+    let ShimEventToShim::StartRes(_res) = res else {
         panic!("Unexpected response: {res:?}");
     };
     #[cfg(target_arch = "x86_64")]

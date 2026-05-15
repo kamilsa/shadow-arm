@@ -1,6 +1,8 @@
+#[cfg(target_arch = "x86_64")]
 use linux_syscall::Result64;
+#[cfg(target_arch = "x86_64")]
 use linux_syscall::syscall;
-
+#[cfg(target_arch = "x86_64")]
 use crate::errno::Errno;
 use crate::{bindings, const_conversions};
 
