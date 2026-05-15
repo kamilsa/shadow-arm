@@ -318,27 +318,9 @@ impl SyscallHandler {
         flags_and_exit_signal: i32,
         child_stack: ForeignPtr<()>,
         ptid: ForeignPtr<kernel_pid_t>,
-        _ctid: ForeignPtr<kernel_pid_t>,
-        _newtls: u64,
+        ctid: ForeignPtr<kernel_pid_t>,
+        newtls: u64,
     ) -> Result<kernel_pid_t, Errno> {
-        // On ARM64 the clone syscall register order differs from x86_64:
-        //   x0=flags, x1=child_stack, x2=parent_tid, x3=child_tls, x4=child_tid
-        // The handler receives positional args from the seccomp SIGSYS handler
-        // which populates them in register order: args[0]=x0, args[1]=x1, etc.
-        // So while ptid (args[2]=x2) is correct, the value passed as _ctid
-        // (args[3]=x3) is actually child_tls and _newtls (args[4]=x4) is
-        // actually child_tid. Fix by re-reading from raw args in proper order.
-        #[cfg(target_arch = "aarch64")]
-        let (ctid, newtls): (ForeignPtr<kernel_pid_t>, u64) = {
-            let ctid = ctx.args.get(4).into();
-            let newtls = ctx.args.get(3).into();
-            (ctid, newtls)
-        };
-        #[cfg(not(target_arch = "aarch64"))]
-        let (ctid, newtls): (ForeignPtr<kernel_pid_t>, u64) = {
-            (_ctid, _newtls)
-        };
-
         let raw_flags = flags_and_exit_signal as u32 & !0xff;
         let raw_exit_signal = (flags_and_exit_signal as u32 & 0xff) as i32;
 

@@ -9,11 +9,8 @@ use std::time::Duration;
 
 use anyhow::Context;
 use atomic_refcell::AtomicRefCell;
-#[cfg(target_arch = "x86_64")]
 use linux_api::prctl::ArchPrctlOp;
-use log::warn;
-#[cfg(target_arch = "x86_64")]
-use log::debug;
+use log::{debug, warn};
 use rand::seq::SliceRandom;
 use rand_xoshiro::Xoshiro256PlusPlus;
 use scheduler::thread_per_core::ThreadPerCoreSched;

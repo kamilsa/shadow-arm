@@ -18,9 +18,7 @@
 #include <sys/wait.h>
 #include <unistd.h>
 
-#ifdef __x86_64__
 #include <asm/ldt.h>
-#endif
 
 #include "test/test_common.h"
 #include "test/test_glib_helpers.h"
@@ -37,7 +35,6 @@
      | CLONE_SYSVSEM /* Share semaphore values */                                                  \
      | CLONE_SETTLS) /* Set thread-local-storage */
 
-#ifdef __x86_64__
 // The "empty" descriptor. We use this to create threads without TLS set up.
 // See arch/x86/include/asm/desc.h and arch/x86/kernel/ldt.c in Linux source.
 //
@@ -51,7 +48,6 @@
 // state. We might be able to do it if this entire test and the shim were
 // completely free of libc dependencies.
 struct user_desc LDT_EMPTY = {.read_exec_only = 1, .seg_not_present = 1};
-#endif
 
 _Noreturn static void _exit_thread(int code) {
     // Exit only this thread. On some platforms returning would result in a
@@ -111,11 +107,7 @@ static void _clone_child_exits_after_leader() {
         _make_stack(&stack_top, &stack_bottom);
 
         int child_tid = clone(_clone_child_exits_after_leader_waitee_thread, stack_top,
-#ifdef __x86_64__
                               CLONE_FLAGS | CLONE_CHILD_CLEARTID, NULL, NULL, &LDT_EMPTY, ctid);
-#else
-                              CLONE_FLAGS | CLONE_CHILD_CLEARTID, NULL, NULL, NULL, ctid);
-#endif
         g_assert_cmpint(child_tid, >, 0);
 
         // Intentionally leak `stack`.
@@ -131,11 +123,7 @@ static void _clone_child_exits_after_leader() {
         _make_stack(&stack_top, &stack_bottom);
 
         int child_tid = clone(_clone_child_exits_after_leader_waiter_thread, stack_top, CLONE_FLAGS,
-#ifdef __x86_64__
                               ctid, NULL, &LDT_EMPTY, NULL);
-#else
-                              ctid, NULL, NULL, NULL);
-#endif
         g_assert_cmpint(child_tid, >, 0);
 
         // Intentionally leak `stack`.

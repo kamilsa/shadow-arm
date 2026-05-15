@@ -36,7 +36,6 @@ pub mod tsc {
     /// Stub Tsc that satisfies the type signatures used by Host.
     /// On ARM64 this is never actually used for emulation (no rdtsc instruction).
     #[repr(C)]
-    #[allow(non_snake_case)]
     pub struct Tsc {
         pub cyclesPerSecond: u64,
     }
@@ -46,7 +45,6 @@ pub mod tsc {
     }
 }
 
-#[cfg(target_arch = "x86_64")]
 /// Check whether the memory starting at `ip` starts with the instruction `insn`.
 ///
 /// Particularly useful in situations where we can be confident that `ip` points
