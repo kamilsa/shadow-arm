@@ -1,6 +1,37 @@
-# The Shadow Simulator
+# The Shadow Simulator (ARM64 Port)
 
-## Quickstart
+This is an **ARM64 Linux port** of [Shadow](https://github.com/shadow/shadow), the discrete-event network simulator. The original project only supports x86-64 Linux. This port enables Shadow to run natively on ARM64 platforms — Apple Silicon (via Docker, Lima, OrbStack), AWS Graviton, Raspberry Pi, and other ARM64 hardware.
+
+The port was done by [kamilsa](https://github.com/kamilsa/leansim) and lives in the `arm64-port` branch. It is used by [LeanSim](https://github.com/kamilsa/leansim), a lightweight simulation framework targeting an ARM64 Docker environment for local development on Apple Silicon Macs.
+
+## Port Status
+
+**236 tests total, 224 passed (95%), 12 failed.**
+
+### Failed Tests
+
+| Test | Issue |
+|---|---|
+| `clone_leader_exits_early-shadow` | Timeout |
+| `clone_leader_exits_early_nomm-shadow` | Timeout |
+| `clone-shadow` | Timeout |
+| `determinism1-compare-shadow` | Failed |
+| `bash-example-shadow` | Failed |
+| `intercept_golang_time-shadow` | Failed |
+| `pipe-shadow` | Failed |
+| `socket-shadow` | Failed |
+| `socket-new-tcp-shadow` | Failed |
+| `stat-shadow` | Failed |
+| `time-shadow` | Failed |
+| `shadowtools-tests` | Failed |
+
+Example apps that pass: `curl`, `http-server`, `wget2`, `iperf-2`, `jetty`.
+
+Known limitations:
+- **etcd**: Go runtime crash under Shadow (known LD_PRELOAD limitation for statically-linked Go binaries)
+- **nginx**: SIGSEGV during HTTP request processing under Shadow on ARM64 (works without Shadow)
+
+## Building and Testing
 
 After installing the [dependencies](https://shadow.github.io/docs/guide/install_dependencies.html): build, test, and install Shadow into `~/.local`:
 
