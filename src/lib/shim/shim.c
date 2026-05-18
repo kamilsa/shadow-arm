@@ -128,7 +128,7 @@ void _shim_parent_init_preload() {
     dprintf(STDERR_FILENO, "SHIM: shim_install_hardware_error_handlers...\n");
     shim_install_hardware_error_handlers();
     dprintf(STDERR_FILENO, "SHIM: shim_install_hardware_error_handlers done\n");
-    //patch_vdso (disabled for testing)
+    patch_vdso((void*)getauxval(AT_SYSINFO_EHDR));
     dprintf(STDERR_FILENO, "SHIM: _shim_parent_init_host_shm...\n");
     _shim_parent_init_host_shm();
     dprintf(STDERR_FILENO, "SHIM: _shim_parent_init_host_shm done\n");
