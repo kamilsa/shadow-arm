@@ -27,7 +27,8 @@ fn with_sched_target_thread<T>(
     f: impl FnOnce(&Thread) -> T,
 ) -> Result<T, Errno> {
     let current_tid = kernel_pid_t::from(ctx.objs.thread.id());
-    if tid == 0 || tid == current_tid {
+    let current_native_pid: kernel_pid_t = ctx.objs.thread.native_pid().as_raw_nonzero().get();
+    if tid == 0 || tid == current_tid || tid == current_native_pid {
         return Ok(f(ctx.objs.thread));
     }
 
@@ -76,10 +77,20 @@ impl SyscallHandler {
         let mask_ptr = mask_ptr.cast::<u8>();
         let mask_ptr = ForeignArrayPtr::new(mask_ptr, cpusetsize);
 
-        let tid = ThreadId::try_from(tid).or(Err(Errno::ESRCH))?;
-        if !ctx.objs.host.has_thread(tid) && kernel_pid_t::from(tid) != 0 {
-            return Err(Errno::ESRCH);
+        // On ARM64, Go's cgo init passes the native PID (from getpid()) instead
+        // of 0. Shadow's ThreadId is an internal ID that may differ from the
+        // native PID, so we must also check the native PID when looking up threads.
+        let current_native_pid: kernel_pid_t = ctx.objs.thread.native_pid().as_raw_nonzero().get();
+        let current_shadow_tid: kernel_pid_t = ctx.objs.thread.id().into();
+        log::warn!("[SCHED_DEBUG] sched_getaffinity: tid_arg={}, native_pid={}, shadow_tid={}", tid, current_native_pid, current_shadow_tid);
+        if tid != 0 && tid != current_native_pid {
+            let tid = ThreadId::try_from(tid).or(Err(Errno::ESRCH))?;
+            if !ctx.objs.host.has_thread(tid) {
+                log::warn!("[SCHED_DEBUG] sched_getaffinity: ESRCH for tid={}", tid);
+                return Err(Errno::ESRCH);
+            }
         }
+        log::warn!("[SCHED_DEBUG] sched_getaffinity: success for tid_arg={}", tid);
 
         // Shadow doesn't have users, so no need to check for permissions
 

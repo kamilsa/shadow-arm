@@ -70,9 +70,6 @@ static void _shim_parent_init_memory_manager() {
         panic("Unexpectedly called from non-shadow context");
     }
 
-    // Temporarily allocate some memory for a separate stack. The MemoryManager
-    // is going to remap the original stack, and we can't actively use it while
-    // it does so.
     const size_t stack_sz = 4096*10;
     void *stack = mmap(NULL, stack_sz, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
     if (stack == MAP_FAILED) {
@@ -80,24 +77,56 @@ static void _shim_parent_init_memory_manager() {
     }
 
     ucontext_t remap_ctx, orig_ctx;
+
+    register uintptr_t sp_before asm("sp");
+    dprintf(STDERR_FILENO, "[MEMDBG] shim: _shim_parent_init_memory_manager sp=%p &orig_ctx=%p &remap_ctx=%p sizeof(ucontext_t)=%zu\n",
+            (void*)sp_before, (void*)&orig_ctx, (void*)&remap_ctx, sizeof(ucontext_t));
+    dprintf(STDERR_FILENO, "[MEMDBG] shim: temp_stack=%p..%p\n", stack, (char*)stack + stack_sz);
+
     if (getcontext(&remap_ctx) != 0) {
         panic("getcontext: %s", strerror(errno));
     }
 
-    // Run on our temporary stack.
     remap_ctx.uc_stack.ss_sp = stack;
     remap_ctx.uc_stack.ss_size = stack_sz;
 
-    // Return to the original ctx (which is initialized by swapcontext, below).
     remap_ctx.uc_link = &orig_ctx;
 
     makecontext(&remap_ctx, _shim_parent_init_memory_manager_internal, 0);
 
-    // Call _shim_parent_init_memory_manager_internal on the configured stack.
-    // Returning from _shim_parent_init_memory_manager_internal will return to
-    // here.
+    dprintf(STDERR_FILENO, "[MEMDBG] shim: calling swapcontext (about to remap stack)...\n");
+    {
+        uintptr_t g_ptr;
+        __asm__ ("mov %0, x28" : "=r"(g_ptr));
+        dprintf(STDERR_FILENO, "[MEMDBG] shim: x28(g)=%p BEFORE remap\n", (void*)g_ptr);
+        if (g_ptr > 0x100000 && g_ptr < 0x2000000) {
+            uint64_t *gp = (uint64_t *)g_ptr;
+            dprintf(STDERR_FILENO, "[MEMDBG] shim: g.stack.lo=%p g.stack.hi=%p g.stackguard0=%p BEFORE remap\n",
+                    (void*)gp[0], (void*)gp[1], (void*)gp[2]);
+        }
+    }
     if (swapcontext(&orig_ctx, &remap_ctx) != 0) {
         panic("swapcontext: %s", strerror(errno));
+    }
+
+    register uintptr_t sp_after asm("sp");
+    dprintf(STDERR_FILENO, "[MEMDBG] shim: swapcontext returned! sp_before=%p sp_after=%p\n",
+            (void*)sp_before, (void*)sp_after);
+
+    // Diagnostic: check if BSS data was preserved after stack remap
+    // Read from a known BSS location to detect memory corruption
+    // We check the first 24 bytes of .bss (offsets 0, 8, 16 = stack.lo, stack.hi, stackguard0)
+    // .bss starts at 0x17bb000 for bootnode (but varies per binary)
+    // Instead, read from the page containing our own global data
+    dprintf(STDERR_FILENO, "[MEMDBG] shim: checking BSS integrity after remap...\n");
+    // Read current thread's g struct if x28 points to BSS
+    uintptr_t g_ptr;
+    __asm__ ("mov %0, x28" : "=r"(g_ptr));
+    dprintf(STDERR_FILENO, "[MEMDBG] shim: x28(g)=%p after remap\n", (void*)g_ptr);
+    if (g_ptr > 0x100000 && g_ptr < 0x2000000) {
+        uint64_t *gp = (uint64_t *)g_ptr;
+        dprintf(STDERR_FILENO, "[MEMDBG] shim: g.stack.lo=%p g.stack.hi=%p g.stackguard0=%p\n",
+                (void*)gp[0], (void*)gp[1], (void*)gp[2]);
     }
 
     if (munmap(stack, stack_sz) != 0) {

@@ -281,33 +281,48 @@ fn map_stack(
     // TODO: get actual max stack limit via getrlimit.
     let max_stack_size: usize = 8 * (1 << 20); // 8 MB.
 
-    // Omit the top page of the stack so that there is still a "stack" region in
-    // the process's maps. This is where the program arguments and environment
-    // are stored; overwriting the region breaks /proc/*/cmdline and
-    // /proc/*/environ, which are used by tools such as ps and htop.
-    let remapped_stack_end = current_stack_bounds.end - page_size();
+    // NOTE: We used to omit the top page to preserve the [stack] label in
+    // /proc/self/maps (for /proc/*/cmdline and environ). However, this breaks
+    // Go's _cgo_init, which calls pthread_attr_getstack to read the [stack]
+    // mapping bounds. With only a tiny [stack] page remaining, the reported
+    // stack base is HIGHER than the actual SP, causing g.stack.lo > g.stack.hi.
+    // Remapping the full stack preserves argv/envp data via copy_into_file.
+    let remapped_stack_end = current_stack_bounds.end;
 
     let remapped_stack_begin = current_stack_bounds.end - max_stack_size;
     let remapped_stack_bounds = remapped_stack_begin..remapped_stack_end;
+
+    log::warn!("[MEMDBG] map_stack: pid={} page_size={}", memory_manager.pid.as_raw_nonzero().get(), page_size());
+    log::warn!("[MEMDBG] map_stack: current_stack_bounds={:#x}..{:#x} (size={})", current_stack_bounds.start, current_stack_bounds.end, current_stack_bounds.end - current_stack_bounds.start);
+    log::warn!("[MEMDBG] map_stack: remapped_stack_bounds={:#x}..{:#x} (size={})", remapped_stack_bounds.start, remapped_stack_bounds.end, remapped_stack_bounds.end - remapped_stack_bounds.start);
+    log::warn!("[MEMDBG] map_stack: max_stack_size={} remapped_end={:#x}", max_stack_size, remapped_stack_end);
+
     let mut region = region.clone();
     region.shadow_base = shm_file.mmap_into_shadow(&remapped_stack_bounds, STACK_PROT);
+    log::warn!("[MEMDBG] map_stack: shadow_base={:p}", region.shadow_base);
 
     // Allocate as much space as we might need.
     shm_file.alloc(&remapped_stack_bounds);
+    log::warn!("[MEMDBG] map_stack: shm_file.len={} after alloc", shm_file.len);
 
     let remapped_overlaps_current = current_stack_bounds.start < remapped_stack_bounds.end;
+    log::warn!("[MEMDBG] map_stack: remapped_overlaps_current={}", remapped_overlaps_current);
 
     // Copy the current contents of the remapped part of the current stack, if any.
     if remapped_overlaps_current {
+        let copy_range = current_stack_bounds.start..remapped_stack_bounds.end;
+        log::warn!("[MEMDBG] map_stack: copy_range={:#x}..{:#x} (size={})", copy_range.start, copy_range.end, copy_range.end - copy_range.start);
         shm_file.copy_into_file(
             memory_manager,
             &remapped_stack_bounds,
             &region,
-            &(current_stack_bounds.start..remapped_stack_bounds.end),
+            &copy_range,
         );
     }
 
+    log::warn!("[MEMDBG] map_stack: calling mmap_into_plugin for {:#x}..{:#x}", remapped_stack_bounds.start, remapped_stack_bounds.end);
     shm_file.mmap_into_plugin(ctx, &remapped_stack_bounds, STACK_PROT);
+    log::warn!("[MEMDBG] map_stack: mmap_into_plugin done");
 
     let mutations = regions.insert(remapped_stack_bounds, region);
     if remapped_overlaps_current {
@@ -315,6 +330,7 @@ fn map_stack(
     } else {
         debug_assert_eq!(mutations.len(), 0);
     }
+    log::warn!("[MEMDBG] map_stack: complete, mutations={}", mutations.len());
 }
 
 impl Drop for MemoryMapper {
@@ -423,9 +439,18 @@ impl MemoryMapper {
             len: 0,
         };
         let regions = get_regions(memory_manager.pid);
+        log::warn!("[MEMDBG] MemoryMapper::new: pid={} shm_plugin_fd={}", memory_manager.pid.as_raw_nonzero().get(), shm_plugin_fd);
+        log::warn!("[MEMDBG] MemoryMapper::new: initial regions from /proc/maps:");
+        for (interval, region) in regions.iter() {
+            log::warn!("[MEMDBG]   {:#x}..{:#x} {:?} prot={:?} sharing={:?}", interval.start, interval.end, region.original_path, region.prot, region.sharing);
+        }
         let mut regions = coalesce_regions(regions);
+        log::warn!("[MEMDBG] MemoryMapper::new: getting heap...");
         let heap = get_heap(ctx, &mut shm_file, memory_manager, &mut regions);
+        log::warn!("[MEMDBG] MemoryMapper::new: heap={:#x}..{:#x}", heap.start, heap.end);
+        log::warn!("[MEMDBG] MemoryMapper::new: mapping stack...");
         map_stack(memory_manager, ctx, &mut shm_file, &mut regions);
+        log::warn!("[MEMDBG] MemoryMapper::new: done. shm_file.len={}", shm_file.len);
 
         MemoryMapper {
             shm_file,
@@ -586,12 +611,13 @@ impl MemoryMapper {
         self.unmap_mutations(mutations);
 
         if is_anonymous && sharing == Sharing::Private {
-            // Overwrite the freshly mapped region with a region from the shared mem file and map
-            // it. In principle we might be able to avoid doing the first mmap above in this case,
-            // but doing so lets the OS decide if it's a legal mapping, and where to put it.
+            log::warn!("[MEMDBG] handle_mmap_result: remapping anon-private {:#x}..{:#x} (size={}) prot={:?}", interval.start, interval.end, interval.len(), prot);
             self.shm_file.alloc(&interval);
             region.shadow_base = self.shm_file.mmap_into_shadow(&interval, prot);
             self.shm_file.mmap_into_plugin(ctx, &interval, prot);
+            log::warn!("[MEMDBG] handle_mmap_result: remapped shadow_base={:p} shm_file.len={}", region.shadow_base, self.shm_file.len);
+        } else {
+            log::warn!("[MEMDBG] handle_mmap_result: NOT remapping {:#x}..{:#x} anon={} sharing={:?}", interval.start, interval.end, is_anonymous, sharing);
         }
 
         // TODO: We *could* handle file mappings and some shared mappings as well. Doesn't make

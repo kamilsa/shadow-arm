@@ -33,7 +33,13 @@ struct fpsimd_save {
     __uint32_t fpcr;
     __uint64_t tpidr_el0;
 };
-static _Thread_local struct fpsimd_save fpsimd_save_buf;
+// NOTE: fpsimd_save_buf must NOT be _Thread_local. On ARM64, _Thread_local
+// variables are accessed via tpidr_el0. Go (and potentially other runtimes)
+// repurpose tpidr_el0 for their own goroutine/thread-local data. If a
+// _Thread_local buffer is used, the SIGSYS handler would save FPSIMD state
+// into the managed process's goroutine struct, corrupting it.
+// Instead, we allocate the buffer on the signal handler's stack frame.
+// The buffer is 528 bytes, well within the altstack's capacity.
 
 static void fpsimd_save(struct fpsimd_save* buf) {
     __asm__ volatile(
@@ -119,17 +125,40 @@ static void _debug_sigsys(const char* label, long syscall_num, const void* pc,
     shim_native_syscall(NULL, SYS_write, STDERR_FILENO, buf, (long)len);
 }
 
+#ifdef __aarch64__
+static void _memdbg_log_tpidr(uintptr_t tpidr, const void* fpsimd_buf) {
+    char buf[256];
+    int len = snprintf(buf, sizeof(buf), "[MEMDBG] SIGSYS handler: tpidr_el0=%p fpsimd_save_buf=%p\n",
+                       (void*)tpidr, fpsimd_buf);
+    if (len > 0 && len < (int)sizeof(buf)) shim_native_syscall(NULL, SYS_write, STDERR_FILENO, buf, len);
+}
+static void _memdbg_log_syscall_entry(long syscall_num, const void* pc, const void* sp, const void* x0, const void* insn) {
+    char buf[256];
+    int len = snprintf(buf, sizeof(buf), "[MEMDBG] SIGSYS entry: n=%ld pc=%p sp=%p x0=%p insn=%p\n",
+                       syscall_num, pc, sp, x0, insn);
+    if (len > 0 && len < (int)sizeof(buf)) shim_native_syscall(NULL, SYS_write, STDERR_FILENO, buf, len);
+}
+static void _memdbg_log_syscall_return(long syscall_num, long rv, const void* sp, const void* pc) {
+    char buf[256];
+    int len = snprintf(buf, sizeof(buf), "[MEMDBG] SIGSYS return: n=%ld rv=%ld sp=%p pc=%p\n",
+                       syscall_num, rv, sp, pc);
+    if (len > 0 && len < (int)sizeof(buf)) shim_native_syscall(NULL, SYS_write, STDERR_FILENO, buf, len);
+}
+#endif
+
 // Handler function that receives syscalls that are stopped by the seccomp filter.
 #ifdef __aarch64__
 __attribute__((target("general-regs-only")))
 #endif
 static void _shim_seccomp_handle_sigsys(int sig, siginfo_t* info, void* voidUcontext) {
 #ifdef __aarch64__
-    // Save NEON/SIMD state before any callee clobbers it.
-    // The kernel saves FPSIMD on the signal stack, but callees of this handler
-    // (shim_syscall, Rust code, libc) may use NEON and modify registers.
-    // We save to a per-thread buffer to avoid touching the signal stack.
+    struct fpsimd_save fpsimd_save_buf;
     fpsimd_save(&fpsimd_save_buf);
+    {
+        uintptr_t tpidr;
+        __asm__ volatile("mrs %0, tpidr_el0" : "=r"(tpidr));
+        _memdbg_log_tpidr(tpidr, (void*)&fpsimd_save_buf);
+    }
 #endif
     ExecutionContext prev_ctx = shim_swapExecutionContext(EXECUTION_CONTEXT_SHADOW);
     ucontext_t* ctx = (ucontext_t*)(voidUcontext);
@@ -170,24 +199,22 @@ static void _shim_seccomp_handle_sigsys(int sig, siginfo_t* info, void* voidUcon
 
     trace("Trapped syscall %ld at %p", syscall_num, syscall_insn_addr);
     _debug_sigsys("entry", syscall_num, pc, syscall_insn_addr, 0);
+#ifdef __aarch64__
+    _memdbg_log_syscall_entry(syscall_num, (void*)ctx->uc_mcontext.pc, (void*)ctx->uc_mcontext.sp, (void*)ctx->uc_mcontext.regs[0], syscall_insn_addr);
+#endif
     if (syscall_insn_addr >= TEXT_START && syscall_insn_addr < TEXT_END) {
         panic("seccomp filter blocked syscall from %p, which is within %p-%p", syscall_insn_addr,
               TEXT_START, TEXT_END);
     }
 
-    // Make the syscall via the *the shim's* syscall function (which overrides
-    // libc's).  It in turn will either emulate it or (if interposition is
-    // disabled), make the call natively. In the latter case, the syscall
-    // will be permitted to execute by the seccomp filter.
-    // Make the syscall via the *the shim's* syscall function (which overrides
-    // libc's).  It in turn will either emulate it or (if interposition is
-    // disabled), make the call natively. In the latter case, the syscall
-    // will be permitted to execute by the seccomp filter.
     long rv = shim_syscall(ctx, prev_ctx, syscall_num, arg1, arg2,
                            arg3, arg4, arg5, arg6);
     trace("Trapped syscall %ld returning %ld", syscall_num, rv);
     _debug_sigsys("return", syscall_num, pc, syscall_insn_addr, rv);
     *return_reg = rv;
+#ifdef __aarch64__
+    _memdbg_log_syscall_return(syscall_num, rv, (void*)ctx->uc_mcontext.sp, (void*)ctx->uc_mcontext.pc);
+#endif
     shim_swapExecutionContext(prev_ctx);
 #ifdef __aarch64__
     // Restore NEON/SIMD state that callees may have clobbered.
@@ -233,11 +260,14 @@ static void _getSectionContaining(const void* target, void** start, void** end) 
     fclose(maps);
 }
 
-// Thread-local selector for syscall_user_dispatch on ARM64.
-// Set to BLOCK normally to intercept syscalls from outside the shim.
-// Callees that need to make native syscalls can set it to ALLOW temporarily.
+// Selector for syscall_user_dispatch on ARM64.
+// Must NOT be _Thread_local: Go (and other runtimes) repurpose tpidr_el0,
+// which would cause _Thread_local accesses to resolve to wrong addresses.
+// The address of this variable is passed to the kernel once via prctl();
+// the kernel reads from that fixed address to decide syscall dispatch.
+// A plain global variable has a stable address regardless of tpidr_el0.
 #ifdef __aarch64__
-static _Thread_local char syscall_dispatch_selector = SYSCALL_DISPATCH_FILTER_BLOCK;
+static char syscall_dispatch_selector = SYSCALL_DISPATCH_FILTER_BLOCK;
 #endif
 
 void shim_seccomp_init() {

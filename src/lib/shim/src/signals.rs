@@ -382,6 +382,7 @@ unsafe fn handle_hardware_error_signal_inner(
         let x22 = uctx.uc_mcontext.regs[22];
         let x23 = uctx.uc_mcontext.regs[23];
         let lr = uctx.uc_mcontext.regs[30];
+        let x28 = uctx.uc_mcontext.regs[28];
         let stderr = unsafe { rustix::fd::BorrowedFd::borrow_raw(2) };
         // Write crash info as simple hex + newlines
         let _ = rustix::io::write(stderr, b"CRASH pc=");
@@ -413,6 +414,33 @@ unsafe fn handle_hardware_error_signal_inner(
         for shift in (0..64).step_by(4).rev() {
             let nib = ((lr >> shift) & 0xf) as u8;
             let _ = rustix::io::write(stderr, &[b"0123456789abcdef"[nib as usize]]);
+        }
+        let _ = rustix::io::write(stderr, b"\nCRASH x28(g)=");
+        for shift in (0..64).step_by(4).rev() {
+            let nib = ((x28 >> shift) & 0xf) as u8;
+            let _ = rustix::io::write(stderr, &[b"0123456789abcdef"[nib as usize]]);
+        }
+        // Dump Go g struct fields: stack.hi (+0), stack.lo (+8), stackguard0 (+16)
+        if x28 != 0 {
+            let g_ptr = x28 as *const u64;
+            let stack_hi = unsafe { g_ptr.read_unaligned() };
+            let stack_lo = unsafe { g_ptr.add(1).read_unaligned() };
+            let stackguard0 = unsafe { g_ptr.add(2).read_unaligned() };
+            let _ = rustix::io::write(stderr, b"\nCRASH g.stack.hi=");
+            for shift in (0..64).step_by(4).rev() {
+                let nib = ((stack_hi >> shift) & 0xf) as u8;
+                let _ = rustix::io::write(stderr, &[b"0123456789abcdef"[nib as usize]]);
+            }
+            let _ = rustix::io::write(stderr, b"\nCRASH g.stack.lo=");
+            for shift in (0..64).step_by(4).rev() {
+                let nib = ((stack_lo >> shift) & 0xf) as u8;
+                let _ = rustix::io::write(stderr, &[b"0123456789abcdef"[nib as usize]]);
+            }
+            let _ = rustix::io::write(stderr, b"\nCRASH g.stackguard0=");
+            for shift in (0..64).step_by(4).rev() {
+                let nib = ((stackguard0 >> shift) & 0xf) as u8;
+                let _ = rustix::io::write(stderr, &[b"0123456789abcdef"[nib as usize]]);
+            }
         }
         let _ = rustix::io::write(stderr, b"\n");
     }

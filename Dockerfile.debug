@@ -1,0 +1,48 @@
+FROM ubuntu:24.04 AS builder
+
+RUN apt-get update -qq && apt-get install -y -qq --no-install-recommends \
+    build-essential cmake pkg-config \
+    libglib2.0-dev libigraph-dev libpcap-dev \
+    libclang-dev llvm-dev curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN curl --proto =https --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.95.0 && \
+    /root/.cargo/bin/rustup default 1.95.0
+ENV PATH="/root/.cargo/bin:${PATH}" \
+    CARGO_HOME="/root/.cargo" \
+    RUSTUP_HOME="/root/.rustup"
+
+COPY . /shadow
+WORKDIR /shadow
+
+RUN echo "Building Shadow with debug logging..." && \
+    ./setup build --clean 2>&1 && \
+    cp build/src/main/shadow /usr/local/bin/shadow && \
+    mkdir -p /usr/local/lib/shadow && \
+    cp build/src/lib/preload-injector/libshadow_injector.so /usr/local/lib/shadow/ && \
+    cp build/src/lib/preload-libc/libshadow_libc.so /usr/local/lib/shadow/ && \
+    cp build/src/lib/preload-openssl/libshadow_openssl_rng.so /usr/local/lib/shadow/ && \
+    cp build/src/lib/preload-openssl/libshadow_openssl_crypto.so /usr/local/lib/shadow/ && \
+    cp build/src/shim/target/release/libshadow_shim.so /usr/local/lib/shadow/ && \
+    echo "Build complete"
+
+FROM kamilsa/shadow-arm:latest
+
+COPY --from=builder /usr/local/bin/shadow /usr/local/bin/shadow
+COPY --from=builder /usr/local/lib/shadow/ /usr/local/lib/shadow/
+
+RUN for f in /usr/local/lib/shadow/*.so; do \
+        base=$(basename "$f"); \
+        ln -sf "$f" /shadow/build/src/lib/preload-injector/ 2>/dev/null || true; \
+        ln -sf "$f" /shadow/build/src/lib/preload-libc/ 2>/dev/null || true; \
+        ln -sf "$f" /shadow/build/src/lib/preload-openssl/ 2>/dev/null || true; \
+        ln -sf "$f" /shadow/build/src/shim/target/release/ 2>/dev/null || true; \
+    done && \
+    ln -sf /usr/local/lib/shadow/libshadow_injector.so /shadow/build/src/lib/preload-injector/ && \
+    ln -sf /usr/local/lib/shadow/libshadow_libc.so /shadow/build/src/lib/preload-libc/ && \
+    ln -sf /usr/local/lib/shadow/libshadow_openssl_rng.so /shadow/build/src/lib/preload-openssl/ && \
+    ln -sf /usr/local/lib/shadow/libshadow_openssl_crypto.so /shadow/build/src/lib/preload-openssl/ && \
+    ln -sf /usr/local/lib/shadow/libshadow_shim.so /shadow/build/src/shim/target/release/ && \
+    echo "Symlinks updated"
+
+ENTRYPOINT ["shadow"]
