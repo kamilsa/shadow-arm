@@ -1,0 +1,45 @@
+--- src/test/clone/test_fork.rs
++++ src/test/clone/test_fork.rs
+@@ -1071,21 +1071,19 @@
+                 let flags =
+                     (CloneFlags::CLONE_VFORK | CloneFlags::CLONE_VM).bits() | (libc::SIGCHLD as u64);
+                 unsafe {
+                     core::arch::asm!(
+-                        // x0 already contains flags
+-                        "mov x1, 0",
+-                        "mov x2, 0",
+-                        "mov x3, 0",
+-                        "mov x4, 0",
+-                        "mov x8, {sys_clone}",
+                         "svc #0",
+                         "cmp x0, 0",
+                         "b.ne 2f",
+ 
+                         // Child
+-                        "mov x0, {path}",
+-                        "mov x1, {args}",
+-                        "mov x2, {env}",
++                        "mov x0, x5",
++                        "mov x1, x6",
++                        "mov x2, x7",
+                         "mov x8, {sys_execve}",
+                         "svc #0",
+                         "brk #0",
+ 
+                         "2:",
+-                        sys_clone = in(reg) libc::SYS_clone,
+-                        path = in(reg) path.as_ptr(),
+-                        args = in(reg) args.as_ptr(),
+-                        env = in(reg) env.as_ptr(),
+                         sys_execve = in(reg) libc::SYS_execve,
+                         inout("x0") flags => raw_pid,
++                        in("x1") 0,
++                        in("x2") 0,
++                        in("x3") 0,
++                        in("x4") 0,
++                        in("x5") path.as_ptr(),
++                        in("x6") args.as_ptr(),
++                        in("x7") env.as_ptr(),
++                        in("x8") libc::SYS_clone,
+                         clobber_abi("C"),
+                     )

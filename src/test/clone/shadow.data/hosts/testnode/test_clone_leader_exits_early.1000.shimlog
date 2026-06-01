@@ -1,0 +1,4 @@
+
+thread '<unnamed>' (11451) panicked at lib/shim/src/lib.rs:290:30:
+RefCell already borrowed
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
