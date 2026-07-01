@@ -17,6 +17,10 @@ static void _getVdsoBounds(void** start, void** end) {
     *end = NULL;
 
     FILE* maps = fopen("/proc/self/maps", "r");
+    if (maps == NULL) {
+        warning("Couldn't open /proc/self/maps; skipping vDSO bounds detection");
+        return;
+    }
     size_t n = 100;
     char* line = malloc(n);
     while (true) {
@@ -325,6 +329,10 @@ static void _inject_trampoline(struct ParsedElf* parsedElf, const char* vdsoFnNa
 }
 
 void patch_vdso(void* vdsoBase) {
+    if (vdsoBase == NULL) {
+        warning("No vDSO base address; skipping vDSO patching");
+        return;
+    }
     struct ParsedElf parsedElf = _parseElf(vdsoBase);
     size_t regionSize = (size_t)parsedElf.mapEnd - (size_t)parsedElf.mapStart;
 
