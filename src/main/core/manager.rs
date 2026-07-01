@@ -659,7 +659,31 @@ impl<'a> Manager<'a> {
                     .unwrap_or_else(|| self.config.general.log_level.unwrap())
                     .to_c_loglevel(),
                 use_new_tcp: self.config.experimental.use_new_tcp.unwrap(),
-                use_mem_mapper: self.config.experimental.use_memory_manager.unwrap(),
+                use_mem_mapper: {
+                    let requested = self.config.experimental.use_memory_manager.unwrap();
+                    // The memory manager (which remaps a managed process's stack
+                    // and heap into a shared-memory file) is currently unsound on
+                    // ARM64: it leaves a degenerate one-page `[stack]` mapping
+                    // that breaks glibc/Go cgo stack-bounds detection (immediate
+                    // SIGSEGV at Go runtime bootstrap), and corrupts the managed
+                    // heap under concurrent load. It's an opt-in performance
+                    // feature (default off), so force it off on aarch64 rather
+                    // than crash every Go process.
+                    if requested && cfg!(target_arch = "aarch64") {
+                        static WARN_ONCE: std::sync::Once = std::sync::Once::new();
+                        WARN_ONCE.call_once(|| {
+                            log::warn!(
+                                "Ignoring use_memory_manager=true: the memory manager is \
+                                 unsound on ARM64 (aarch64) and corrupts managed processes \
+                                 (notably cgo Go programs such as geth/prysm). Running with \
+                                 the memory manager disabled."
+                            );
+                        });
+                        false
+                    } else {
+                        requested
+                    }
+                },
                 use_syscall_counters: self.config.experimental.use_syscall_counters.unwrap(),
             };
 
