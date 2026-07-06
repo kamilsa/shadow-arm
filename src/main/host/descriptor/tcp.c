@@ -2487,10 +2487,14 @@ gssize tcp_sendUserData(TCP* tcp, const Host* host, UntypedForeignPtr buffer, gs
         }
     }
 
-    /* maximum data we can send network, o/w tcp truncates and only sends 65536*/
-    gsize acceptable = MIN(nBytes, 65535);
+    /* Accept as much as fits in the send buffer. Capping a single send below
+     * the available space (as an old MIN(nBytes, 65535) cap here did) breaks the
+     * invariant that a partial write means the buffer is full: edge-triggered
+     * epoll users (e.g. tokio/mio) treat a short write as "wait for EPOLLOUT",
+     * but no edge ever fires because the socket never became unwritable,
+     * deadlocking the connection. Segmentation below already bounds packets. */
     gsize space = _tcp_getBufferSpaceOut(tcp);
-    gsize remaining = MIN(acceptable, space);
+    gsize remaining = MIN(nBytes, space);
 
     /* break data into segments and send each in a packet */
     gsize maxPacketLength = CONFIG_TCP_MAX_SEGMENT_SIZE;
