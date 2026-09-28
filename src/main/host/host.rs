@@ -45,7 +45,7 @@ use crate::host::process::Process;
 use crate::host::thread::{Thread, ThreadId};
 use crate::network::PacketDevice;
 use crate::network::relay::{RateLimit, Relay};
-use crate::network::router::Router;
+use crate::network::router::{Router, UPLINK_ROUTER_ADDR, UplinkRouter};
 use crate::utility;
 #[cfg(feature = "perf_timers")]
 use crate::utility::perf_timer::PerfTimer;
@@ -116,12 +116,23 @@ pub struct Host {
 
     random: RefCell<Xoshiro256PlusPlus>,
 
-    // The upstream router that will queue packets until we can receive them.
-    // This only applies to the internet interface; the localhost interface
-    // does not receive packets from a router.
+    // The downstream router that queues packets arriving from the network until
+    // we can receive them. This only applies to the internet interface; the
+    // localhost interface does not receive packets from a router.
     router: RefCell<Router>,
 
-    // Forwards packets out from our internet interface to the router.
+    // The uplink router that queues packets leaving the host. It accepts
+    // packets as fast as the process produces them and buffers them in a CoDel
+    // queue, rather than applying back pressure through the socket send buffer.
+    // This only applies to the internet interface.
+    uplink_router: RefCell<UplinkRouter>,
+
+    // Forwards packets out from our internet interface into the uplink router.
+    // This relay is unlimited and only moves packets from the socket send
+    // buffers into the uplink router's CoDel queue.
+    relay_iface_to_uplink: Arc<Relay>,
+    // Forwards packets out of the uplink router's CoDel queue to the network at
+    // the upload bandwidth.
     relay_inet_out: Arc<Relay>,
     // Forwards packets from the router in to our internet interface.
     relay_inet_in: Arc<Relay>,
@@ -264,13 +275,32 @@ impl Host {
 
         let net_ns = NetworkNamespace::new(public_ip, pcap_options, params.qdisc);
 
-        // Packets that are not for localhost or our public ip go to the router.
-        // Use `Ipv4Addr::UNSPECIFIED` for the router to encode this for our
-        // routing table logic inside of `Host::get_packet_device()`.
+        // Packets that are not for localhost or our public ip go to the
+        // downstream router. Use `Ipv4Addr::UNSPECIFIED` for the router to
+        // encode this for our routing table logic inside of
+        // `Host::get_packet_device()`.
         let router = Router::new(Ipv4Addr::UNSPECIFIED);
+
+        // The uplink router buffers packets leaving the host so that the socket
+        // send buffers only need to hold the data between the process and the
+        // NIC. It has its own synthetic address in the routing table.
+        let uplink_router = UplinkRouter::new(UPLINK_ROUTER_ADDR);
+
+        // Drain the socket send buffers into the uplink router as fast as the
+        // process produces packets. This relay is unlimited; applying the
+        // upload rate limit here is what caused `EWOULDBLOCK` to stand in for
+        // congestion loss.
+        let relay_iface_to_uplink = Relay::new_point_to_point(
+            RateLimit::Unlimited,
+            net_ns.internet.borrow().get_address(),
+            uplink_router.get_address(),
+        );
+
+        // Forward packets from the uplink router's CoDel queue to the network
+        // at the upload bandwidth.
         let relay_inet_out = Relay::new(
             RateLimit::BytesPerSecond(params.requested_bw_up_bits / 8),
-            net_ns.internet.borrow().get_address(),
+            uplink_router.get_address(),
         );
         let relay_inet_in = Relay::new(
             RateLimit::BytesPerSecond(params.requested_bw_down_bits / 8),
@@ -289,6 +319,8 @@ impl Host {
             event_queue: Arc::new(Mutex::new(EventQueue::new())),
             params,
             router: RefCell::new(router),
+            uplink_router: RefCell::new(uplink_router),
+            relay_iface_to_uplink: Arc::new(relay_iface_to_uplink),
             relay_inet_out: Arc::new(relay_inet_out),
             relay_inet_in: Arc::new(relay_inet_in),
             relay_loopback: Arc::new(relay_loopback),
@@ -933,6 +965,8 @@ impl Host {
             self.net_ns.localhost.borrow()
         } else if address == self.default_ip() {
             self.net_ns.internet.borrow()
+        } else if address == self.uplink_router.borrow().get_address() {
+            self.uplink_router.borrow()
         } else {
             self.router.borrow()
         }
@@ -944,9 +978,16 @@ impl Host {
         self.relay_inet_in.notify(self);
     }
 
+    /// Call to trigger the forwarding of packets from the uplink router's CoDel
+    /// queue to the network at the upload bandwidth. This is called whenever a
+    /// packet is added to the uplink router.
+    pub fn notify_uplink_router_has_packets(&self) {
+        self.relay_inet_out.notify(self);
+    }
+
     /// Call to trigger the forwarding of packets from the network interface to
-    /// the next hop (either back to the network interface for loopback, or up to
-    /// the router for internet-bound packets).
+    /// the next hop (either back to the network interface for loopback, or into
+    /// the uplink router for internet-bound packets).
     ///
     /// WARNING: This is not reentrant. Do not allow this to be called recursively. Nothing in
     /// `add_data_source()` or `notify()` can call back into this method. This includes any socket
@@ -960,7 +1001,7 @@ impl Host {
             iface.add_data_source(socket);
             match addr {
                 Ipv4Addr::LOCALHOST => self.relay_loopback.notify(self),
-                _ => self.relay_inet_out.notify(self),
+                _ => self.relay_iface_to_uplink.notify(self),
             };
         }
 

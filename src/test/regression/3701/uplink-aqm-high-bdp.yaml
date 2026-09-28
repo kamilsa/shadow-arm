@@ -1,0 +1,106 @@
+# Regression test for https://github.com/shadow/shadow/issues/3701
+#
+# This is the other case from the issue: a high bandwidth-delay product
+# (50 Mbit * 200 ms ~= 1.25 MiB) that is *larger* than the socket send buffer.
+# Previously the send buffer filled up and `EWOULDBLOCK` rate-limited the
+# sender, so the congestion controller never observed loss. With the uplink
+# CoDel router, the sender can enqueue the whole burst quickly (the uplink queue
+# absorbs it) and the queue drops under CoDel rather than only delaying packets.
+general:
+  stop_time: 60 s
+  # keep the sender's per-syscall overhead out of the elapsed-time measurement
+  model_unblocked_syscall_latency: false
+
+network:
+  graph:
+    type: gml
+    inline: |
+      graph [
+        directed 0
+        node [
+          id 0
+          host_bandwidth_down "50 Mbit"
+          host_bandwidth_up "50 Mbit"
+        ]
+        edge [
+          source 0
+          target 0
+          latency "200 ms"
+          jitter "0 ms"
+          packet_loss 0.0
+        ]
+      ]
+
+hosts:
+  server:
+    network_node_id: 0
+    processes:
+    - path: python3
+      args:
+        - '-u'
+        - '-c'
+        - |
+          import select
+          import socket
+          import time
+
+          s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+          s.bind(('0.0.0.0', 8080))
+          s.setblocking(False)
+
+          received = 0
+          print(f"recv={received}", flush=True)
+          start = time.time()
+
+          while True:
+              if time.time() - start > 10:
+                  print(f"recv={received}", flush=True)
+                  raise SystemExit(0)
+
+              r, _, _ = select.select([s], [], [], 0.5)
+              if not r:
+                  continue
+
+              while True:
+                  try:
+                      data = s.recv(65535)
+                  except BlockingIOError:
+                      break
+                  if data == b'stop':
+                      print(f"recv={received}", flush=True)
+                      raise SystemExit(0)
+                  received += len(data)
+
+              print(f"recv={received}", flush=True)
+
+  client:
+    network_node_id: 0
+    processes:
+    - path: python3
+      start_time: 100 ms
+      args:
+        - '-u'
+        - '-c'
+        - |
+          import socket
+          import time
+
+          s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+          s.connect(('server', 8080))
+
+          payload = b'x' * 1000
+          count = 20000
+
+          start = time.time()
+          for _ in range(count):
+              s.send(payload)
+          elapsed = time.time() - start
+          print(f"sent={count * len(payload)} elapsed={elapsed:.6f}", flush=True)
+
+          # Retry a sentinel so the server can report its final count even if
+          # some datagrams are dropped by the uplink queue.
+          for _ in range(100):
+              s.send(b'stop')
+              time.sleep(0.02)
+
+          time.sleep(5)

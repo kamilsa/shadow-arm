@@ -58,6 +58,11 @@ struct RelayInternal {
     _counter: ObjectCounter,
     rate_limiter: Option<TokenBucket>,
     src_dev_address: Ipv4Addr,
+    /// If `Some`, packets are always forwarded to the `PacketDevice` registered
+    /// for this address instead of the device registered for the packet's
+    /// destination address. This is used to forward packets to an intermediate
+    /// device (such as the uplink router) before they are sent to the network.
+    dst_dev_address: Option<Ipv4Addr>,
     state: RelayState,
     next_packet: Option<PacketRc>,
 }
@@ -88,7 +93,31 @@ impl Relay {
     /// the given `src_dev_address` to `Host::get_packet_device()`. The `Relay`
     /// internally schedules tasks as needed to ensure packets continue to be
     /// forwarded over time without exceeding the configured `RateLimit`.
+    ///
+    /// Each packet is forwarded to the `PacketDevice` registered for the
+    /// packet's destination address.
     pub fn new(rate: RateLimit, src_dev_address: Ipv4Addr) -> Self {
+        Self::new_internal(rate, src_dev_address, None)
+    }
+
+    /// Like [`Relay::new()`], but forwards every packet to the `PacketDevice`
+    /// registered for `dst_dev_address`, regardless of the packet's destination
+    /// address. This is useful when packets must pass through an intermediate
+    /// device (for example, a host's uplink router) before reaching their
+    /// destination.
+    pub fn new_point_to_point(
+        rate: RateLimit,
+        src_dev_address: Ipv4Addr,
+        dst_dev_address: Ipv4Addr,
+    ) -> Self {
+        Self::new_internal(rate, src_dev_address, Some(dst_dev_address))
+    }
+
+    fn new_internal(
+        rate: RateLimit,
+        src_dev_address: Ipv4Addr,
+        dst_dev_address: Option<Ipv4Addr>,
+    ) -> Self {
         let rate_limiter = match rate {
             RateLimit::BytesPerSecond(bytes) => Some(create_token_bucket(bytes)),
             RateLimit::Unlimited => None,
@@ -99,6 +128,7 @@ impl Relay {
                 _counter: ObjectCounter::new("Relay"),
                 rate_limiter,
                 src_dev_address,
+                dst_dev_address,
                 state: RelayState::Idle,
                 next_packet: None,
             }),
@@ -220,10 +250,17 @@ impl Relay {
                 return None;
             };
 
+            // The address of the device that we will forward this packet to.
+            // This is normally the packet's destination, but a point-to-point
+            // relay forwards to a fixed device instead.
+            let dst_dev_address = internal
+                .dst_dev_address
+                .unwrap_or(*packet.dst_ipv4_address().ip());
+
             // The packet is local if the src and dst refer to the same device.
             // This can happen for the loopback device, and for the inet device
             // if both sockets use the public ip to communicate over localhost.
-            let is_local = src.get_address() == *packet.dst_ipv4_address().ip();
+            let is_local = src.get_address() == dst_dev_address;
 
             // Check if we have enough tokens for forward the packet. Rate
             // limits do not apply during bootstrapping, or if the source and
@@ -266,7 +303,7 @@ impl Relay {
                 src.push(packet);
             } else {
                 // The source and destination are different.
-                let dst = host.get_packet_device(*packet.dst_ipv4_address().ip());
+                let dst = host.get_packet_device(dst_dev_address);
                 dst.push(packet);
             }
         }
