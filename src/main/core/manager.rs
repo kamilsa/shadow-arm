@@ -456,6 +456,21 @@ impl<'a> Manager<'a> {
             let thread_next_event_times: Vec<AtomicRefCell<Option<EmulatedTime>>> =
                 vec![AtomicRefCell::new(None); scheduler.parallelism()];
 
+            // the real time at which each thread (or logical processor for the thread-per-host
+            // scheduler) finished running its hosts in the current round; allocated here for the
+            // same reason
+            let thread_finish_times: Vec<AtomicRefCell<Option<std::time::Instant>>> =
+                vec![AtomicRefCell::new(None); scheduler.parallelism()];
+
+            // the data given to each thread each round
+            let thread_round_data: Vec<_> = thread_next_event_times
+                .iter()
+                .zip(&thread_finish_times)
+                .collect();
+
+            // statistics about the scheduling rounds
+            let mut scheduling_stats = sim_stats::SchedulingStats::default();
+
             // how often to log heartbeat messages
             let heartbeat_interval = self
                 .config
@@ -479,14 +494,19 @@ impl<'a> Manager<'a> {
                         state.current = display_time;
                     });
 
+                let round_start = std::time::Instant::now();
+                // the time at which the tasks were started and this thread began waiting
+                let mut round_wait_start = round_start;
+
                 // run the events
                 scheduler.scope(|s| {
                     // run the closure on each of the scheduler's threads
                     s.run_with_data(
-                        &thread_next_event_times,
+                        &thread_round_data,
                         // each call of the closure is given an abstract thread-specific host
-                        // iterator, and an element of 'thread_next_event_times'
-                        move |_, hosts, next_event_time| {
+                        // iterator, and an element of 'thread_next_event_times' and
+                        // 'thread_finish_times'
+                        move |_, hosts, (next_event_time, finish_time)| {
                             let mut next_event_time = next_event_time.borrow_mut();
 
                             worker::Worker::reset_next_event_time();
@@ -512,6 +532,8 @@ impl<'a> Manager<'a> {
                                 .into_iter()
                                 .flatten() // filter out None
                                 .reduce(std::cmp::min);
+
+                            *finish_time.borrow_mut() = Some(std::time::Instant::now());
                         },
                     );
 
@@ -531,7 +553,20 @@ impl<'a> Manager<'a> {
                         time_of_last_usage_check = current_time;
                         self.check_resource_usage();
                     }
+
+                    round_wait_start = std::time::Instant::now();
                 });
+
+                let round_end = std::time::Instant::now();
+                scheduling_stats.add_round(
+                    round_end - round_start,
+                    round_end - round_wait_start,
+                    thread_finish_times
+                        .iter()
+                        // the take() resets it to None for the next scheduling loop
+                        .filter_map(|x| x.borrow_mut().take())
+                        .map(|x| round_end.saturating_duration_since(x)),
+                );
 
                 // get the minimum next event time for all threads (also resets the next event times
                 // to None while we have them borrowed)
@@ -555,6 +590,10 @@ impl<'a> Manager<'a> {
                     .controller
                     .manager_finished_current_round(min_next_event_time);
             }
+
+            worker::with_global_sim_stats(|stats| {
+                *stats.scheduling.lock().unwrap() = scheduling_stats;
+            });
 
             scheduler.scope(|s| {
                 s.run_with_hosts(move |_, hosts| {
