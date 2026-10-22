@@ -105,20 +105,6 @@ static void* TEXT_START = NULL;
 // one thread.
 static void* TEXT_END = NULL;
 
-static void _debug_sigsys(const char* label, long syscall_num, const void* pc,
-                          const void* syscall_insn_addr, long rv) {
-    char buf[256];
-    int len = snprintf(buf, sizeof(buf), "SIGSYS_DEBUG %s n=%ld pc=%p insn=%p rv=%ld\n", label,
-                       syscall_num, pc, syscall_insn_addr, rv);
-    if (len < 0) {
-        return;
-    }
-    if (len > (int)sizeof(buf)) {
-        len = sizeof(buf);
-    }
-    shim_native_syscall(NULL, SYS_write, STDERR_FILENO, buf, (long)len);
-}
-
 // Handler function that receives syscalls that are stopped by the seccomp filter.
 #ifdef __aarch64__
 __attribute__((target("general-regs-only")))
@@ -147,8 +133,7 @@ static void _shim_seccomp_handle_sigsys(int sig, siginfo_t* info, void* voidUcon
     const long arg4 = regs[REG_R10];
     const long arg5 = regs[REG_R8];
     const long arg6 = regs[REG_R9];
-    const void* pc = (void*)regs[REG_RIP];
-    // pc points to instruction *after* the syscall instruction, which is 2 bytes long.
+    // rip points to instruction *after* the syscall instruction, which is 2 bytes long.
     const void* syscall_insn_addr = (void*)regs[REG_RIP] - SIZEOF_SYSCALL_INSN;
     unsigned long long* return_reg = &ctx->uc_mcontext.gregs[REG_RAX];
 #else
@@ -163,13 +148,11 @@ static void _shim_seccomp_handle_sigsys(int sig, siginfo_t* info, void* voidUcon
     const long arg5 = ctx->uc_mcontext.regs[4];
     const long arg6 = ctx->uc_mcontext.regs[5];
     // pc (saved in sigcontext) points to the instruction after svc.
-    const void* pc = (void*)ctx->uc_mcontext.pc;
     const void* syscall_insn_addr = (void*)(ctx->uc_mcontext.pc - SIZEOF_SYSCALL_INSN);
     unsigned long long* return_reg = &ctx->uc_mcontext.regs[0];
 #endif
 
     trace("Trapped syscall %ld at %p", syscall_num, syscall_insn_addr);
-    _debug_sigsys("entry", syscall_num, pc, syscall_insn_addr, 0);
     if (syscall_insn_addr >= TEXT_START && syscall_insn_addr < TEXT_END) {
         panic("seccomp filter blocked syscall from %p, which is within %p-%p", syscall_insn_addr,
               TEXT_START, TEXT_END);
@@ -179,14 +162,9 @@ static void _shim_seccomp_handle_sigsys(int sig, siginfo_t* info, void* voidUcon
     // libc's).  It in turn will either emulate it or (if interposition is
     // disabled), make the call natively. In the latter case, the syscall
     // will be permitted to execute by the seccomp filter.
-    // Make the syscall via the *the shim's* syscall function (which overrides
-    // libc's).  It in turn will either emulate it or (if interposition is
-    // disabled), make the call natively. In the latter case, the syscall
-    // will be permitted to execute by the seccomp filter.
     long rv = shim_syscall(ctx, prev_ctx, syscall_num, arg1, arg2,
                            arg3, arg4, arg5, arg6);
     trace("Trapped syscall %ld returning %ld", syscall_num, rv);
-    _debug_sigsys("return", syscall_num, pc, syscall_insn_addr, rv);
     *return_reg = rv;
     shim_swapExecutionContext(prev_ctx);
 #ifdef __aarch64__
