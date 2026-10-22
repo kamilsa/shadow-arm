@@ -152,6 +152,12 @@ Experimental (Unstable and may change or be removed at any time, regardless of S
       --use-dynamic-runahead <bool>
           Update the minimum runahead dynamically throughout the simulation. [default: false]
 
+      --use-host-pair-runahead <bool>
+          Calculate the runahead from the smallest latency between distinct hosts, ignoring the
+          self-loop latency of network nodes that only have a single host. Set to false to calculate
+          the runahead from the smallest latency of any path (Shadow's original behaviour).
+          [default: true]
+
       --use-memory-manager <bool>
           Use the MemoryManager in memory-mapping mode. This can improve performance, but disables
           support for dynamically spawning processes inside the simulation (e.g. the `fork`

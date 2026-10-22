@@ -288,10 +288,22 @@ impl<'a> Manager<'a> {
         let bootstrap_end_time: SimulationTime = bootstrap_end_time.try_into().unwrap();
         let bootstrap_end_time = EmulatedTime::SIMULATION_START + bootstrap_end_time;
 
+        let use_host_pair_runahead = self.config.experimental.use_host_pair_runahead.unwrap();
+
+        // with host-pair runahead, ignore self-loops of nodes with only a single host since packets
+        // that a host sends to itself never traverse the network graph
+        let smallest_host_pair_latency = use_host_pair_runahead
+            .then(|| {
+                manager_config
+                    .routing_info
+                    .get_smallest_latency_ns_between_hosts(
+                        manager_config.hosts.iter().map(|x| x.network_node_id),
+                    )
+            })
+            .flatten();
         let smallest_latency = SimulationTime::from_nanos(
-            manager_config
-                .routing_info
-                .get_smallest_latency_ns()
+            smallest_host_pair_latency
+                .or_else(|| manager_config.routing_info.get_smallest_latency_ns())
                 .unwrap(),
         );
 

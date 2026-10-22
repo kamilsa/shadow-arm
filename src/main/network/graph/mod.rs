@@ -472,6 +472,32 @@ impl<T: Eq + Hash + std::fmt::Display + Clone + Copy> RoutingInfo<T> {
     pub fn get_smallest_latency_ns(&self) -> Option<u64> {
         self.paths.values().map(|x| x.latency_ns).min()
     }
+
+    /// Get the smallest latency of any path between two distinct hosts, where each item of
+    /// `host_nodes` is the node of one host. A node's self-loop is only considered if at least two
+    /// hosts are attached to that node. Returns `None` if there are fewer than two hosts.
+    pub fn get_smallest_latency_ns_between_hosts(
+        &self,
+        host_nodes: impl IntoIterator<Item = T>,
+    ) -> Option<u64> {
+        // number of hosts attached to each node
+        let mut hosts_per_node = HashMap::<T, usize>::new();
+        for node in host_nodes {
+            *hosts_per_node.entry(node).or_default() += 1;
+        }
+
+        self.paths
+            .iter()
+            .filter(|((start, end), _)| {
+                if start == end {
+                    hosts_per_node.get(start).is_some_and(|x| *x >= 2)
+                } else {
+                    hosts_per_node.contains_key(start) && hosts_per_node.contains_key(end)
+                }
+            })
+            .map(|(_, x)| x.latency_ns)
+            .min()
+    }
 }
 
 /// Read and decompress a file.
@@ -641,6 +667,52 @@ mod tests {
                 assert_eq!(lookup_latency(node_2, node_2), 7777);
             }
         }
+    }
+
+    #[test]
+    fn test_smallest_latency_between_hosts() {
+        let path = |latency_ns| PathProperties {
+            latency_ns,
+            packet_loss: 0.0,
+        };
+        let routing_info = RoutingInfo::new(HashMap::from([
+            ((0, 0), path(1)),
+            ((0, 1), path(12)),
+            ((1, 0), path(12)),
+            ((1, 1), path(1)),
+            ((2, 2), path(5)),
+            ((0, 2), path(3)),
+            ((2, 0), path(3)),
+            ((1, 2), path(20)),
+            ((2, 1), path(20)),
+        ]));
+
+        assert_eq!(routing_info.get_smallest_latency_ns(), Some(1));
+        // self-loops are ignored when each node has a single host
+        assert_eq!(
+            routing_info.get_smallest_latency_ns_between_hosts([0, 1]),
+            Some(12)
+        );
+        // paths between nodes without hosts are ignored
+        assert_eq!(
+            routing_info.get_smallest_latency_ns_between_hosts([1, 2]),
+            Some(20)
+        );
+        // self-loops are used when multiple hosts share a node
+        assert_eq!(
+            routing_info.get_smallest_latency_ns_between_hosts([0, 0]),
+            Some(1)
+        );
+        assert_eq!(
+            routing_info.get_smallest_latency_ns_between_hosts([1, 2, 2]),
+            Some(5)
+        );
+        // a single host has no host pairs
+        assert_eq!(
+            routing_info.get_smallest_latency_ns_between_hosts([0]),
+            None
+        );
+        assert_eq!(routing_info.get_smallest_latency_ns_between_hosts([]), None);
     }
 
     #[test]

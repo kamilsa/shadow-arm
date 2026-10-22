@@ -418,6 +418,14 @@ pub struct ExperimentalOptions {
     #[clap(help = EXP_HELP.get("use_dynamic_runahead").unwrap().as_str())]
     pub use_dynamic_runahead: Option<bool>,
 
+    /// Calculate the runahead from the smallest latency between distinct hosts, ignoring the
+    /// self-loop latency of network nodes that only have a single host. Set to false to calculate
+    /// the runahead from the smallest latency of any path (Shadow's original behaviour).
+    #[clap(hide_short_help = true)]
+    #[clap(long, value_name = "bool")]
+    #[clap(help = EXP_HELP.get("use_host_pair_runahead").unwrap().as_str())]
+    pub use_host_pair_runahead: Option<bool>,
+
     /// Initial size of the socket's send buffer
     #[clap(hide_short_help = true)]
     #[clap(long, value_name = "bytes")]
@@ -561,6 +569,7 @@ impl Default for ExperimentalOptions {
                 units::TimePrefix::Milli,
             ))),
             use_dynamic_runahead: Some(false),
+            use_host_pair_runahead: Some(true),
             socket_send_buffer: Some(units::Bytes::new(131_072, units::SiPrefixUpper::Base)),
             socket_send_autotune: Some(true),
             socket_recv_buffer: Some(units::Bytes::new(174_760, units::SiPrefixUpper::Base)),

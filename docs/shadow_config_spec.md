@@ -89,6 +89,7 @@ hosts:
 - [`experimental.unblocked_vdso_latency`](#experimentalunblocked_vdso_latency)
 - [`experimental.use_cpu_pinning`](#experimentaluse_cpu_pinning)
 - [`experimental.use_dynamic_runahead`](#experimentaluse_dynamic_runahead)
+- [`experimental.use_host_pair_runahead`](#experimentaluse_host_pair_runahead)
 - [`experimental.use_memory_manager`](#experimentaluse_memory_manager)
 - [`experimental.use_new_tcp`](#experimentaluse_new_tcp)
 - [`experimental.use_object_counters`](#experimentaluse_object_counters)
@@ -498,6 +499,25 @@ Default: false
 Type: Bool
 
 Update the minimum runahead dynamically throughout the simulation.
+
+#### `experimental.use_host_pair_runahead`
+
+Default: true  
+Type: Bool
+
+Calculate the runahead from the smallest latency between distinct hosts,
+ignoring the self-loop latency of network nodes that only have a single host.
+Set to false to calculate the runahead from the smallest latency of any path
+(Shadow's original behaviour).
+
+Packets that a host sends to itself never traverse the network graph, so a
+self-loop's latency is only used for packets between distinct hosts attached to
+the same node. Graphs commonly have a small self-loop latency on every node,
+which would otherwise limit every scheduling round to that latency even when no
+two hosts share a node. Enabling this option results in larger and fewer
+scheduling rounds, which can significantly reduce the simulation's run time.
+Since the runahead is still no larger than the latency between any two hosts,
+packet delivery times are not affected.
 
 #### `experimental.use_memory_manager`
 
