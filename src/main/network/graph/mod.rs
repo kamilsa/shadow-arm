@@ -427,46 +427,16 @@ impl<T: Copy + Eq + Hash + std::fmt::Display> Default for IpAssignment<T> {
 #[derive(Debug)]
 pub struct RoutingInfo<T: Eq + Hash + std::fmt::Display + Clone + Copy> {
     paths: HashMap<(T, T), PathProperties>,
-    packet_counters: std::sync::RwLock<HashMap<(T, T), u64>>,
 }
 
 impl<T: Eq + Hash + std::fmt::Display + Clone + Copy> RoutingInfo<T> {
     pub fn new(paths: HashMap<(T, T), PathProperties>) -> Self {
-        Self {
-            paths,
-            packet_counters: std::sync::RwLock::new(HashMap::new()),
-        }
+        Self { paths }
     }
 
     /// Get properties for the path from one node to another.
     pub fn path(&self, start: T, end: T) -> Option<PathProperties> {
         self.paths.get(&(start, end)).copied()
-    }
-
-    /// Increment the number of packets sent from one node to another.
-    pub fn increment_packet_count(&self, start: T, end: T) {
-        let key = (start, end);
-        let mut packet_counters = self.packet_counters.write().unwrap();
-        match packet_counters.get_mut(&key) {
-            Some(x) => *x = x.saturating_add(1),
-            None => assert!(packet_counters.insert(key, 1).is_none()),
-        }
-    }
-
-    /// Log the number of packets sent between nodes.
-    pub fn log_packet_counts(&self) {
-        // only logs paths that have transmitted at least one packet
-        for ((start, end), count) in self.packet_counters.read().unwrap().iter() {
-            let path = self.paths.get(&(*start, *end)).unwrap();
-            log::debug!(
-                "Found path {}->{}: latency={}ns, packet_loss={}, packet_count={}",
-                start,
-                end,
-                path.latency_ns,
-                path.packet_loss,
-                count,
-            );
-        }
     }
 
     pub fn get_smallest_latency_ns(&self) -> Option<u64> {

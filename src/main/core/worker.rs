@@ -370,7 +370,6 @@ impl Worker {
         let delay = Worker::with(|w| w.shared.latency(src_ip, dst_ip).unwrap()).unwrap();
 
         Worker::update_lowest_used_latency(delay);
-        Worker::with(|w| w.shared.increment_packet_count(src_ip, dst_ip)).unwrap();
 
         // TODO: this should change for sending to remote manager (on a different machine); this is
         // the only place where tasks are sent between separate host
@@ -532,13 +531,6 @@ impl WorkerShared {
 
     pub fn bandwidth(&self, ip: std::net::IpAddr) -> Option<&Bandwidth> {
         self.host_bandwidths.get(&ip)
-    }
-
-    pub fn increment_packet_count(&self, src: std::net::IpAddr, dst: std::net::IpAddr) {
-        let src = self.ip_assignment.get_node(src).unwrap();
-        let dst = self.ip_assignment.get_node(dst).unwrap();
-
-        self.routing_info.increment_packet_count(src, dst)
     }
 
     pub fn is_routable(&self, src: std::net::IpAddr, dst: std::net::IpAddr) -> bool {
