@@ -3,7 +3,8 @@
 # much as possible interposing via the seccomp method which is slightly less
 # efficient. Preloading means we can prevent mode transitions and executions of
 # the seccomp filter.
-add_library(shadow_libc SHARED libcall_wrappers.c syscall_wrappers.c libc_impls.c)
+add_library(shadow_libc SHARED libcall_wrappers.c syscall_wrappers.c libc_impls.c
+    legacy_syscall_wrappers.c)
 
 # Disable the builtin execve, exit, and fork functions in this compilation unit
 # which have different call signatures than the functions in syscalls.c.
