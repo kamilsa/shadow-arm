@@ -1,4 +1,16 @@
-use std::sync::{Arc, Condvar, Mutex};
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, Mutex};
+use std::time::{Duration, Instant};
+
+use nix::errno::Errno;
+
+use crate::sync::simple_latch::libc_futex;
+
+/// How long a spinning waiter will `sched_yield` in a loop before futex-waiting. Most scheduling
+/// rounds with little work finish within this time, so a spinning waiter can avoid the latency of
+/// being woken from a futex wait. Longer rounds are dominated by the work itself, so there's little
+/// benefit to spinning longer and occupying a CPU.
+const SPIN_DURATION: Duration = Duration::from_micros(100);
 
 /// A latch counter.
 ///
@@ -25,12 +37,19 @@ pub struct LatchWaiter {
     inner: Arc<LatchInner>,
     /// An ID for this waiter's count-down round.
     generation: usize,
+    /// Should we `sched_yield` in a loop for a short time before futex-waiting?
+    spin_yield: bool,
 }
 
 #[derive(Debug)]
 struct LatchInner {
     lock: Mutex<LatchState>,
-    cond: Condvar,
+    /// Incremented after any change to the latch state that may allow a waiter to return. Waiters
+    /// futex-wait on this value.
+    seq: AtomicU32,
+    /// Number of waiters that are currently futex-waiting (or about to) on `seq`. Used to avoid
+    /// making a futex-wake syscall when there's nobody to wake.
+    sleepers: AtomicU32,
 }
 
 #[derive(Debug)]
@@ -58,7 +77,8 @@ pub fn build_count_down_latch() -> (LatchCounter, LatchWaiter) {
             total_counters: 1,
             total_waiters: 1,
         }),
-        cond: Condvar::new(),
+        seq: AtomicU32::new(0),
+        sleepers: AtomicU32::new(0),
     });
 
     let counter = LatchCounter {
@@ -69,6 +89,7 @@ pub fn build_count_down_latch() -> (LatchCounter, LatchWaiter) {
     let waiter = LatchWaiter {
         inner,
         generation: 0,
+        spin_yield: false,
     };
 
     (counter, waiter)
@@ -81,6 +102,60 @@ impl LatchState {
         self.counters = self.total_counters;
         self.waiters = self.total_waiters;
         self.generation = self.generation.wrapping_add(1);
+    }
+}
+
+impl LatchInner {
+    /// Wake any waiters so that they re-check the latch state. Must be called after the state was
+    /// changed (and may be called after the lock was released).
+    fn notify(&self) {
+        // This and the `sleepers` increment in `wait()` must be `SeqCst` so that either we see the
+        // waiter's `sleepers` increment and wake it, or the waiter sees the new `seq` value and
+        // doesn't sleep.
+        self.seq.fetch_add(1, Ordering::SeqCst);
+
+        if self.sleepers.load(Ordering::SeqCst) > 0 {
+            libc_futex(
+                &self.seq,
+                libc::FUTEX_WAKE | libc::FUTEX_PRIVATE_FLAG,
+                i32::MAX as u32,
+                None,
+                None,
+                0,
+            )
+            .expect("FUTEX_WAKE failed");
+        }
+    }
+
+    /// Wait until `seq` is no longer `seq_val`.
+    fn wait_for_notify(&self, seq_val: u32, spin_yield: bool) {
+        if spin_yield {
+            let start = Instant::now();
+            while start.elapsed() < SPIN_DURATION {
+                if self.seq.load(Ordering::Acquire) != seq_val {
+                    return;
+                }
+                std::hint::spin_loop();
+                std::thread::yield_now();
+            }
+        }
+
+        self.sleepers.fetch_add(1, Ordering::SeqCst);
+        if self.seq.load(Ordering::SeqCst) == seq_val {
+            let rv = libc_futex(
+                &self.seq,
+                libc::FUTEX_WAIT | libc::FUTEX_PRIVATE_FLAG,
+                seq_val,
+                None,
+                None,
+                0,
+            );
+            assert!(
+                matches!(rv, Ok(_) | Err(Errno::EAGAIN | Errno::EINTR)),
+                "FUTEX_WAIT failed with {rv:?}"
+            );
+        }
+        self.sleepers.fetch_sub(1, Ordering::SeqCst);
     }
 }
 
@@ -108,7 +183,7 @@ impl LatchCounter {
 
         // if this is the last counter, notify the waiters
         if counters == 0 {
-            self.inner.cond.notify_all();
+            self.inner.notify();
         }
 
         self.generation = self.generation.wrapping_add(1);
@@ -116,26 +191,47 @@ impl LatchCounter {
 }
 
 impl LatchWaiter {
+    /// Set whether the waiter should `sched_yield` in a loop for a short time before futex-waiting.
+    /// This may reduce the latency of [`wait()`](Self::wait) returning if the counters count down
+    /// soon after the wait begins, at the cost of occupying a CPU while spinning.
+    pub fn set_spin_yield(&mut self, spin_yield: bool) {
+        self.spin_yield = spin_yield;
+    }
+
     /// Wait for the latch count to reach 0. If the latch count has already reached 0 for the
     /// current genration, this will return immediately.
     pub fn wait(&mut self) {
-        {
-            let lock = self.inner.lock.lock().unwrap();
+        loop {
+            // must be read before checking the state so that we don't miss a notification that
+            // happens after the check
+            let seq_val = self.inner.seq.load(Ordering::Acquire);
 
-            let mut lock = self
-                .inner
-                .cond
+            {
+                let mut lock = self.inner.lock.lock().unwrap();
+
                 // wait until we're in the active generation and all counters have counted down
-                .wait_while(lock, |x| self.generation != x.generation || x.counters > 0)
-                .unwrap();
+                if self.generation == lock.generation && lock.counters == 0 {
+                    lock.waiters = lock.waiters.checked_sub(1).unwrap();
 
-            lock.waiters = lock.waiters.checked_sub(1).unwrap();
+                    // if this is the last waiter (and we already know that there are no more
+                    // counters), start the next generation
+                    let advanced = lock.waiters == 0;
+                    if advanced {
+                        lock.advance_generation();
+                    }
+                    let counters = lock.counters;
+                    std::mem::drop(lock);
 
-            // if this is the last waiter (and we already know that there are no more counters), start
-            // the next generation
-            if lock.waiters == 0 {
-                lock.advance_generation();
+                    // if there are no counters, waiters of the new generation can return
+                    if advanced && counters == 0 {
+                        self.inner.notify();
+                    }
+
+                    break;
+                }
             }
+
+            self.inner.wait_for_notify(seq_val, self.spin_yield);
         }
 
         self.generation = self.generation.wrapping_add(1);
@@ -172,40 +268,56 @@ impl Clone for LatchWaiter {
         LatchWaiter {
             inner: Arc::clone(&self.inner),
             generation: self.generation,
+            spin_yield: self.spin_yield,
         }
     }
 }
 
 impl std::ops::Drop for LatchCounter {
     fn drop(&mut self) {
-        let mut lock = self.inner.lock.lock().unwrap();
-        lock.total_counters = lock.total_counters.checked_sub(1).unwrap();
+        let counters;
+        {
+            let mut lock = self.inner.lock.lock().unwrap();
+            lock.total_counters = lock.total_counters.checked_sub(1).unwrap();
 
-        // if we haven't already counted down during the current generation
-        if self.generation == lock.generation {
-            lock.counters = lock.counters.checked_sub(1).unwrap();
+            // if we haven't already counted down during the current generation
+            if self.generation == lock.generation {
+                lock.counters = lock.counters.checked_sub(1).unwrap();
+            }
+
+            counters = lock.counters;
         }
 
         // if this is the last counter, notify the waiters
-        if lock.counters == 0 {
-            self.inner.cond.notify_all();
+        if counters == 0 {
+            self.inner.notify();
         }
     }
 }
 
 impl std::ops::Drop for LatchWaiter {
     fn drop(&mut self) {
-        let mut lock = self.inner.lock.lock().unwrap();
-        lock.total_waiters = lock.total_waiters.checked_sub(1).unwrap();
+        let advanced_with_no_counters;
+        {
+            let mut lock = self.inner.lock.lock().unwrap();
+            lock.total_waiters = lock.total_waiters.checked_sub(1).unwrap();
 
-        // if we haven't already waited during the current generation
-        if self.generation == lock.generation {
-            lock.waiters = lock.waiters.checked_sub(1).unwrap();
+            // if we haven't already waited during the current generation
+            if self.generation == lock.generation {
+                lock.waiters = lock.waiters.checked_sub(1).unwrap();
+            }
+
+            // if this is the last waiter and there are no more counters, start the next generation
+            let advanced = lock.waiters == 0 && lock.counters == 0;
+            if advanced {
+                lock.advance_generation();
+            }
+            advanced_with_no_counters = advanced && lock.counters == 0;
         }
 
-        // if this is the last waiter and there are no more counters, start the next generation
-        if lock.waiters == 0 && lock.counters == 0 {
-            lock.advance_generation();
+        // if there are no counters, waiters of the new generation can return
+        if advanced_with_no_counters {
+            self.inner.notify();
         }
     }
 }
@@ -375,5 +487,67 @@ mod tests {
         for h in handles {
             h.join().unwrap();
         }
+    }
+
+    /// Many short generations with many threads, for both spinning and futex-waiting. Each
+    /// generation, every thread adds to a shared sum before counting down, and the waiter checks
+    /// that it observes all of the additions.
+    fn stress(spin_yield: bool) {
+        use std::sync::atomic::AtomicUsize;
+
+        let num_threads = 8;
+        let generations = 2000;
+
+        let (mut start_counter, mut start_waiter) = build_count_down_latch();
+        let (mut end_counter, mut end_waiter) = build_count_down_latch();
+        start_waiter.set_spin_yield(spin_yield);
+        end_waiter.set_spin_yield(spin_yield);
+
+        let sum = Arc::new(AtomicUsize::new(0));
+
+        let handles: Vec<_> = (0..num_threads)
+            .map(|_| {
+                let mut start_waiter = start_waiter.clone();
+                let mut end_counter = end_counter.clone();
+                let sum = Arc::clone(&sum);
+                std::thread::spawn(move || {
+                    for _ in 0..generations {
+                        start_waiter.wait();
+                        sum.fetch_add(1, Ordering::Relaxed);
+                        end_counter.count_down();
+                    }
+                })
+            })
+            .collect();
+
+        // the original start waiter and end counter aren't used by any thread
+        std::mem::drop(start_waiter);
+        end_counter.count_down();
+
+        for generation in 0..generations {
+            start_counter.count_down();
+            end_waiter.wait();
+            assert_eq!(sum.load(Ordering::Relaxed), (generation + 1) * num_threads);
+            // the original end counter must count down every generation
+            if generation + 1 < generations {
+                end_counter.count_down();
+            }
+        }
+
+        for h in handles {
+            h.join().unwrap();
+        }
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn test_stress_futex() {
+        stress(false);
+    }
+
+    #[test]
+    #[cfg_attr(miri, ignore)]
+    fn test_stress_spin() {
+        stress(true);
     }
 }

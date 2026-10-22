@@ -51,7 +51,10 @@ impl UnboundedThreadPool {
             has_thread_panicked: AtomicBool::new(false),
         });
 
-        let (task_end_counter, task_end_waiter) = build_count_down_latch();
+        let (task_end_counter, mut task_end_waiter) = build_count_down_latch();
+        // the end-of-task latch is waited on by the thread that started the task, which may
+        // spin briefly to reduce the latency of short tasks
+        task_end_waiter.set_spin_yield(yield_spin);
         let mut task_start_latch = simple_latch::Latch::new();
 
         let mut thread_handles = Vec::new();
